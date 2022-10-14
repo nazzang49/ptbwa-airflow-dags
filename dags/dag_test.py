@@ -29,7 +29,7 @@ default_args = {
 }
 
 with DAG('databricks_dag',
-    start_date=datetime(2022, 10, 13),
+    start_date=datetime(2022, 10, 25),
     schedule_interval='@daily',
     catchup=False,
     default_args=default_args
