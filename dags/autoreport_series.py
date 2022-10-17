@@ -66,56 +66,56 @@ with DAG('autoreport_series_dag',
     series_api_run_1 = DatabricksSubmitRunOperator(
         task_id='series_api_task_1',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",     # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
         notebook_task=series_api_task_1
     )
 
     series_sql_run_1 = DatabricksSubmitRunOperator(
         task_id='series_sql_task_1',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_sql_task_1
     )
 
     series_api_run_2 = DatabricksSubmitRunOperator(
         task_id='series_api_task_2',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_api_task_2
     )
 
     series_api_run_3 = DatabricksSubmitRunOperator(
         task_id='series_api_task_3',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_api_task_3
     )
 
     series_api_run_4 = DatabricksSubmitRunOperator(
         task_id='series_api_task_4',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_api_task_4
     )
 
     series_api_run_5 = DatabricksSubmitRunOperator(
         task_id='series_api_task_5',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_api_task_5
     )
 
     series_api_run_6 = DatabricksSubmitRunOperator(
         task_id='series_api_task_6',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_api_task_6
     )
 
     series_sql_run_2 = DatabricksSubmitRunOperator(
         task_id='series_sql_task_2',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="test",  # All-Purpose Cluster
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
         notebook_task=series_sql_task_2
     )
 
