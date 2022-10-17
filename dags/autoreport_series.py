@@ -10,35 +10,35 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-series_api_task_1 = {
+series_api_task = {
     'notebook_path': '/Shared/autoreport/series/series-ad',
 }
 
-series_api_task_2 = {
+series_gad_api_task = {
     'notebook_path': '/Shared/autoreport/series/series-gad',
 }
 
-series_api_task_3 = {
+series_fb_api_task = {
     'notebook_path': '/Shared/autoreport/series/series-fb',
 }
 
-series_api_task_4 = {
+series_twt_api_task = {
     'notebook_path': '/Shared/autoreport/series/series-twt',
 }
 
-series_api_task_5 = {
+series_asa_api_task = {
     'notebook_path': '/Shared/autoreport/series/series-asa',
 }
 
-series_api_task_6 = {
+series_tik_api_task = {
     'notebook_path': '/Shared/autoreport/series/series-tik',
 }
 
-series_sql_task_1 = {
+series_stat_sql_task = {
     'notebook_path': '/Shared/autoreport/series/series-ad-stat',
 }
 
-series_sql_task_2 = {
+series_report_sql_task = {
     'notebook_path': '/Shared/autoreport/series/series-report-join',
 }
 
@@ -63,62 +63,62 @@ with DAG('autoreport_series_dag',
     default_args=default_args
     ) as dag:
 
-    series_api_run_1 = DatabricksSubmitRunOperator(
-        task_id='series_api_task_1',
+    series_api_run = DatabricksSubmitRunOperator(
+        task_id='series_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=series_api_task_1
+        notebook_task=series_api_task
     )
 
-    series_sql_run_1 = DatabricksSubmitRunOperator(
-        task_id='series_sql_task_1',
+    series_stat_sql_run = DatabricksSubmitRunOperator(
+        task_id='series_stat_sql_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_sql_task_1
+        notebook_task=series_stat_sql_task
     )
 
-    series_api_run_2 = DatabricksSubmitRunOperator(
-        task_id='series_api_task_2',
+    series_gad_api_run = DatabricksSubmitRunOperator(
+        task_id='series_gad_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_api_task_2
+        notebook_task=series_gad_api_task
     )
 
-    series_api_run_3 = DatabricksSubmitRunOperator(
-        task_id='series_api_task_3',
+    series_fb_api_run = DatabricksSubmitRunOperator(
+        task_id='series_fb_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_api_task_3
+        notebook_task=series_fb_api_task
     )
 
-    series_api_run_4 = DatabricksSubmitRunOperator(
-        task_id='series_api_task_4',
+    series_twt_api_run = DatabricksSubmitRunOperator(
+        task_id='series_twt_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_api_task_4
+        notebook_task=series_twt_api_task
     )
 
-    series_api_run_5 = DatabricksSubmitRunOperator(
-        task_id='series_api_task_5',
+    series_asa_api_run = DatabricksSubmitRunOperator(
+        task_id='series_asa_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_api_task_5
+        notebook_task=series_asa_api_task
     )
 
-    series_api_run_6 = DatabricksSubmitRunOperator(
-        task_id='series_api_task_6',
+    series_tik_api_run = DatabricksSubmitRunOperator(
+        task_id='series_tik_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_api_task_6
+        notebook_task=series_tik_api_task
     )
 
-    series_sql_run_2 = DatabricksSubmitRunOperator(
-        task_id='series_sql_task_2',
+    series_report_sql_run = DatabricksSubmitRunOperator(
+        task_id='series_report_sql_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=series_sql_task_2
+        notebook_task=series_report_sql_task
     )
 
-    series_api_run_1 >> series_sql_run_1
-    series_sql_run_1 >> [series_api_run_2, series_api_run_3, series_api_run_4, series_api_run_5, series_api_run_6]
-    [series_api_run_2, series_api_run_3, series_api_run_4, series_api_run_5, series_api_run_6] >> series_sql_run_2
+    series_api_run >> series_stat_sql_run
+    series_stat_sql_run >> [series_gad_api_run, series_fb_api_run, series_twt_api_run, series_asa_api_run, series_tik_api_run]
+    [series_gad_api_run, series_fb_api_run, series_twt_api_run, series_asa_api_run, series_tik_api_run] >> series_report_sql_run

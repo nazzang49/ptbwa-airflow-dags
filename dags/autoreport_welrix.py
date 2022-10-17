@@ -10,12 +10,16 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-funble_airb_api_task = {
-    'notebook_path': '/Shared/autoreport/funble/funble-airb',
+welrix_daily_api_task = {
+    'notebook_path': '/Users/jinyoung.park@ptbwa.com/welrix-daily',
 }
 
-funble_sql_task = {
-    'notebook_path': '/Shared/autoreport/funble/funble_deduct_report_join',
+welrix_traffic_stat_sql_task = {
+    'notebook_path': '/Shared/autoreport/welrix/welrix-traffic-stat',
+}
+
+welrix_groupby_stat_sql_task = {
+    'notebook_path': '/Shared/autoreport/welrix/welrix-groupby-stat',
 }
 
 #Define params for Run Now Operator
@@ -32,25 +36,32 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_funble_dag',
+with DAG('autoreport_welrix_dag',
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,
     default_args=default_args
     ) as dag:
 
-    funble_airb_api_task = DatabricksSubmitRunOperator(
-        task_id='funble_airb_api_task',
+    welrix_daily_api_run = DatabricksSubmitRunOperator(
+        task_id='welrix_daily_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=funble_airb_api_task
+        notebook_task=welrix_daily_api_task
     )
 
-    funble_sql_task = DatabricksSubmitRunOperator(
-        task_id='funble_sql_task',
+    welrix_traffic_stat_sql_run = DatabricksSubmitRunOperator(
+        task_id='welrix_traffic_stat_sql_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=funble_sql_task
+        notebook_task=welrix_traffic_stat_sql_task
     )
 
-    funble_airb_api_task >> funble_sql_task
+    welrix_groupby_stat_sql_run = DatabricksSubmitRunOperator(
+        task_id='welrix_groupby_stat_sql_task',
+        databricks_conn_id='databricks_default',
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        notebook_task=welrix_groupby_stat_sql_task
+    )
+
+    welrix_daily_api_run >> welrix_traffic_stat_sql_run >> welrix_groupby_stat_sql_run

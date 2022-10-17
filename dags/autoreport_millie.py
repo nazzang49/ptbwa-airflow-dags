@@ -10,12 +10,12 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-funble_airb_api_task = {
-    'notebook_path': '/Shared/autoreport/funble/funble-airb',
+millie_af_raw_task = {
+    'notebook_path': '/Shared/TO-BE-JOBS/daily_agg/appsflyer_raw_millie',
 }
 
-funble_sql_task = {
-    'notebook_path': '/Shared/autoreport/funble/funble_deduct_report_join',
+millie_af_mmp_task = {
+    'notebook_path': '/Shared/autoreport/millie/appsflyer_millie_mmp_stat',
 }
 
 #Define params for Run Now Operator
@@ -32,25 +32,25 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_funble_dag',
+with DAG('autoreport_millie_dag',
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,
     default_args=default_args
     ) as dag:
 
-    funble_airb_api_task = DatabricksSubmitRunOperator(
-        task_id='funble_airb_api_task',
+    millie_af_raw_run = DatabricksSubmitRunOperator(
+        task_id='millie_af_raw_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=funble_airb_api_task
+        notebook_task=millie_af_raw_task
     )
 
-    funble_sql_task = DatabricksSubmitRunOperator(
-        task_id='funble_sql_task',
+    millie_af_mmp_run = DatabricksSubmitRunOperator(
+        task_id='millie_af_mmp_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=funble_sql_task
+        notebook_task=millie_af_mmp_task
     )
 
-    funble_airb_api_task >> funble_sql_task
+    millie_af_raw_run >> millie_af_mmp_run
