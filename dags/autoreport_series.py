@@ -56,7 +56,7 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('databricks_dag',
+with DAG('autoreport_series_dag',
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,
