@@ -119,4 +119,4 @@ with DAG('autoreport_pcar_dag',
         notebook_task=pcar_keyword_stat_w_sql_task
     )
 
-    pcar_af_api_run >> pcar_gsheet_api_run >> pcar_keyword_asa_api_run >> pcar_keyword_nsa_mo_api_run >> pcar_keyword_nsa_rent_api_run >> [pcar_stat_sql_run, pcar_keyword_stat_d_sql_run, pcar_keyword_stat_w_sql_run]
+    [pcar_af_api_run, pcar_gsheet_api_run, pcar_keyword_asa_api_run, pcar_keyword_nsa_mo_api_run] >> pcar_keyword_nsa_rent_api_run >> [pcar_stat_sql_run, pcar_keyword_stat_d_sql_run, pcar_keyword_stat_w_sql_run]
