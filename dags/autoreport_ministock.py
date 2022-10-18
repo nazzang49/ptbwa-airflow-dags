@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -76,8 +76,8 @@ with DAG('autoreport_ministock_dag',
         notebook_task=ministock_tik_api_task
     )
 
-    start_run = DummyOperator(task_id="start")
+    start_run = EmptyOperator(task_id="start")
 
-    end_run = DummyOperator(task_id="end")
+    end_run = EmptyOperator(task_id="end")
 
     start_run >> [ministock_gad_api_run, ministock_fb_api_run, ministock_asa_api_run, ministock_tik_api_task] >> end_run

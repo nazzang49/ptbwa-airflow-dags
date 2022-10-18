@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -76,8 +76,8 @@ with DAG('autoreport_kcar_dag',
         notebook_task=kcar_nsa_api_task
     )
 
-    start_run = DummyOperator(task_id="start")
+    start_run = EmptyOperator(task_id="start")
 
-    end_run = DummyOperator(task_id="end")
+    end_run = EmptyOperator(task_id="end")
 
     start_run >> kcar_ad_api_run >> [kcar_gad_api_run, kcar_kmt_api_run, kcar_nsa_api_run] >> end_run
