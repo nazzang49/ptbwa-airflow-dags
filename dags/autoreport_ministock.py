@@ -76,9 +76,8 @@ with DAG('autoreport_ministock_dag',
         notebook_task=ministock_tik_api_task
     )
 
-    start_run = DummyOperator(task_id="start")
+    # start_run = DummyOperator(task_id="start")
+    #
+    # end_run = DummyOperator(task_id="end")
 
-    end_run = DummyOperator(task_id="end")
-
-    start_run >> [ministock_gad_api_run, ministock_fb_api_run, ministock_asa_api_run, ministock_tik_api_task]
-    [ministock_gad_api_run, ministock_fb_api_run, ministock_asa_api_run, ministock_tik_api_task] >> end_run
+    [ministock_gad_api_run, ministock_fb_api_run, ministock_asa_api_run, ministock_tik_api_task]

@@ -65,8 +65,8 @@ with DAG('autoreport_latam_dag',
         notebook_task=latam_tik_api_task
     )
 
-    start_run = DummyOperator(task_id="start")
+    # start_run = DummyOperator(task_id="start")
+    #
+    # end_run = DummyOperator(task_id="end")
 
-    end_run = DummyOperator(task_id="end")
-
-    start_run >> [latam_gad_api_run, latam_tik_api_run, latam_fb_api_task] >> end_run
+    [latam_gad_api_run, latam_tik_api_run, latam_fb_api_task]
