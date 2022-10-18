@@ -11,24 +11,24 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-millie_keyword_nsa_api_task = {
-    'notebook_path': '/Shared/autoreport/millie/mille-nsa',
+kakaopay_fb_api_task = {
+    'notebook_path': '/Shared/autoreport/kakaopay/kakaopay-fb',
 }
 
-millie_keyword_nsa_second_api_task = {
-    'notebook_path': '/Shared/autoreport/millie/mille-nsa-second',
+kakaopay_gad_ono_api_task = {
+    'notebook_path': '/Shared/autoreport/kakaopay/kakaopay-gad-ono',
 }
 
-millie_keyword_asa_api_task = {
-    'notebook_path': '/Shared/autoreport/millie/mille-asa',
+kakaopay_gad_search_api_task = {
+    'notebook_path': '/Shared/autoreport/kakaopay/kakaopay-gad-search',
 }
 
-millie_keyword_gad_api_task = {
-    'notebook_path': '/Shared/autoreport/millie/millie-gad',
+kakaopay_kmt_api_task = {
+    'notebook_path': '/Shared/autoreport/kakaopay/kakaopay-kmt',
 }
 
-millie_keyword_stat_sql_task = {
-    'notebook_path': '/Shared/autoreport/millie/millie_keyword_stat_d',
+kakaopay_kmt_keyword_api_task = {
+    'notebook_path': '/Shared/autoreport/kakaopay/kakaopay-kmt-keyword',
 }
 
 #Define params for Run Now Operator
@@ -45,50 +45,50 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_millie_keyword_dag',
+with DAG('autoreport_kakaopay_dag',
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,
     default_args=default_args
     ) as dag:
 
-    millie_keyword_nsa_api_run = DatabricksSubmitRunOperator(
-        task_id='millie_keyword_nsa_api_task',
+    kakaopay_fb_api_run = DatabricksSubmitRunOperator(
+        task_id='kakaopay_fb_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=millie_keyword_nsa_api_task
+        notebook_task=kakaopay_fb_api_task
     )
 
-    millie_keyword_nsa_second_api_run = DatabricksSubmitRunOperator(
-        task_id='millie_keyword_nsa_second_api_task',
+    kakaopay_gad_ono_api_run = DatabricksSubmitRunOperator(
+        task_id='kakaopay_gad_ono_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=millie_keyword_nsa_second_api_task
+        notebook_task=kakaopay_gad_ono_api_task
     )
 
-    millie_keyword_gad_api_run = DatabricksSubmitRunOperator(
-        task_id='millie_keyword_gad_api_task',
+    kakaopay_gad_search_api_run = DatabricksSubmitRunOperator(
+        task_id='kakaopay_gad_search_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=millie_keyword_gad_api_task
+        notebook_task=kakaopay_gad_search_api_task
     )
 
-    millie_keyword_asa_api_run = DatabricksSubmitRunOperator(
-        task_id='millie_keyword_asa_api_task',
+    kakaopay_kmt_api_run = DatabricksSubmitRunOperator(
+        task_id='kakaopay_kmt_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=millie_keyword_asa_api_task
+        notebook_task=kakaopay_kmt_api_task
     )
 
-    millie_keyword_stat_sql_run = DatabricksSubmitRunOperator(
-        task_id='millie_keyword_stat_sql_task',
+    kakaopay_kmt_keyword_api_run = DatabricksSubmitRunOperator(
+        task_id='kakaopay_kmt_keyword_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=millie_keyword_stat_sql_task
+        notebook_task=kakaopay_kmt_keyword_api_task
     )
 
     start_run = DummyOperator(task_id="start")
 
     end_run = DummyOperator(task_id="end")
 
-    start_run >> [millie_keyword_nsa_api_run, millie_keyword_nsa_second_api_run, millie_keyword_asa_api_run, millie_keyword_gad_api_run] >> millie_keyword_stat_sql_run >> end_run
+    start_run >> [kakaopay_fb_api_run, kakaopay_gad_ono_api_run, kakaopay_gad_search_api_run, kakaopay_kmt_api_run, kakaopay_kmt_keyword_api_run] >> end_run
