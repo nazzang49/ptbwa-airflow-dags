@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.dummy import DummyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -54,8 +54,8 @@ with DAG('autoreport_funble_dag',
         notebook_task=funble_sql_task
     )
 
-    start_run = EmptyOperator(task_id="start")
+    start_run = DummyOperator(task_id="start")
 
-    end_run = EmptyOperator(task_id="end")
+    end_run = DummyOperator(task_id="end")
 
     start_run >> funble_airb_api_task >> funble_sql_task >> end_run
