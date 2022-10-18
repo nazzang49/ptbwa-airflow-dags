@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.dummy import DummyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -87,8 +87,8 @@ with DAG('autoreport_millie_keyword_dag',
         notebook_task=millie_keyword_stat_sql_task
     )
 
-    start_run = EmptyOperator(task_id="start")
+    start_run = DummyOperator(task_id="start")
 
-    end_run = EmptyOperator(task_id="end")
+    end_run = DummyOperator(task_id="end")
 
     start_run >> [millie_keyword_nsa_api_run, millie_keyword_nsa_second_api_run, millie_keyword_asa_api_run, millie_keyword_gad_api_run] >> millie_keyword_stat_sql_run >> end_run

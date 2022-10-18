@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.dummy import DummyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -87,8 +87,8 @@ with DAG('autoreport_kakaopay_dag',
         notebook_task=kakaopay_kmt_keyword_api_task
     )
 
-    start_run = EmptyOperator(task_id="start")
+    start_run = DummyOperator(task_id="start")
 
-    end_run = EmptyOperator(task_id="end")
+    end_run = DummyOperator(task_id="end")
 
     start_run >> [kakaopay_fb_api_run, kakaopay_gad_ono_api_run, kakaopay_gad_search_api_run, kakaopay_kmt_api_run, kakaopay_kmt_keyword_api_run] >> end_run

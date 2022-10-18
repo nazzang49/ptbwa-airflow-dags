@@ -1,5 +1,5 @@
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.dummy import DummyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -120,9 +120,9 @@ with DAG('autoreport_pcar_dag',
         notebook_task=pcar_keyword_stat_w_sql_task
     )
 
-    start_run = EmptyOperator(task_id="start")
+    start_run = DummyOperator(task_id="start")
 
-    end_run = EmptyOperator(task_id="end")
+    end_run = DummyOperator(task_id="end")
 
     start_run >> [pcar_af_api_run, pcar_gsheet_api_run, pcar_keyword_nsa_mo_api_run, pcar_keyword_nsa_rent_api_run, pcar_keyword_asa_api_run] >> pcar_keyword_stat_d_sql_run
     pcar_keyword_stat_d_sql_run >> pcar_keyword_stat_w_sql_run >> end_run
