@@ -11,12 +11,20 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-millie_af_raw_task = {
-    'notebook_path': '/Shared/TO-BE-JOBS/daily_agg/appsflyer_raw_millie',
+kcar_ad_api_task = {
+    'notebook_path': '/Shared/autoreport/kcar/kcar-ad',
 }
 
-millie_af_mmp_task = {
-    'notebook_path': '/Shared/autoreport/millie/appsflyer_millie_mmp_stat',
+kcar_gad_api_task = {
+    'notebook_path': '/Shared/autoreport/kcar/kcar-gad',
+}
+
+kcar_kmt_api_task = {
+    'notebook_path': '/Shared/autoreport/kcar/kcar-kmt',
+}
+
+kcar_nsa_api_task = {
+    'notebook_path': '/Shared/autoreport/kcar/kcar-nsa',
 }
 
 #Define params for Run Now Operator
@@ -33,29 +41,43 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_millie_dag',
+with DAG('autoreport_kcar_dag',
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,
     default_args=default_args
     ) as dag:
 
-    millie_af_raw_run = DatabricksSubmitRunOperator(
-        task_id='millie_af_raw_task',
+    kcar_ad_api_run = DatabricksSubmitRunOperator(
+        task_id='kcar_ad_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=millie_af_raw_task
+        notebook_task=kcar_ad_api_task
     )
 
-    millie_af_mmp_run = DatabricksSubmitRunOperator(
-        task_id='millie_af_mmp_task',
+    kcar_gad_api_run = DatabricksSubmitRunOperator(
+        task_id='kcar_gad_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=millie_af_mmp_task
+        notebook_task=kcar_gad_api_task
+    )
+
+    kcar_kmt_api_run = DatabricksSubmitRunOperator(
+        task_id='kcar_kmt_api_task',
+        databricks_conn_id='databricks_default',
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        notebook_task=kcar_kmt_api_task
+    )
+
+    kcar_nsa_api_run = DatabricksSubmitRunOperator(
+        task_id='kcar_nsa_api_task',
+        databricks_conn_id='databricks_default',
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        notebook_task=kcar_nsa_api_task
     )
 
     start_run = DummyOperator(task_id="start")
 
     end_run = DummyOperator(task_id="end")
 
-    start_run >> millie_af_raw_run >> millie_af_mmp_run >> end_run
+    start_run >> kcar_ad_api_run >> [kcar_gad_api_run, kcar_kmt_api_run, kcar_nsa_api_run] >> end_run

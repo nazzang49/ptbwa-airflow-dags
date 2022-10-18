@@ -11,12 +11,16 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-millie_af_raw_task = {
-    'notebook_path': '/Shared/TO-BE-JOBS/daily_agg/appsflyer_raw_millie',
+latam_fb_api_task = {
+    'notebook_path': '/Shared/autoreport/latam/latam-fb',
 }
 
-millie_af_mmp_task = {
-    'notebook_path': '/Shared/autoreport/millie/appsflyer_millie_mmp_stat',
+latam_gad_api_task = {
+    'notebook_path': '/Shared/autoreport/latam/latam-gad',
+}
+
+latam_tik_api_task = {
+    'notebook_path': '/Shared/autoreport/latam/latam-tik',
 }
 
 #Define params for Run Now Operator
@@ -33,29 +37,36 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_millie_dag',
+with DAG('autoreport_latam_dag',
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,
     default_args=default_args
     ) as dag:
 
-    millie_af_raw_run = DatabricksSubmitRunOperator(
-        task_id='millie_af_raw_task',
+    latam_fb_api_run = DatabricksSubmitRunOperator(
+        task_id='latam_fb_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=millie_af_raw_task
+        notebook_task=latam_fb_api_task
     )
 
-    millie_af_mmp_run = DatabricksSubmitRunOperator(
-        task_id='millie_af_mmp_task',
+    latam_gad_api_run = DatabricksSubmitRunOperator(
+        task_id='latam_gad_api_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=millie_af_mmp_task
+        notebook_task=latam_gad_api_task
+    )
+
+    latam_tik_api_run = DatabricksSubmitRunOperator(
+        task_id='latam_tik_api_task',
+        databricks_conn_id='databricks_default',
+        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        notebook_task=latam_tik_api_task
     )
 
     start_run = DummyOperator(task_id="start")
 
     end_run = DummyOperator(task_id="end")
 
-    start_run >> millie_af_raw_run >> millie_af_mmp_run >> end_run
+    start_run >> [latam_gad_api_run, latam_tik_api_run, latam_fb_api_task] >> end_run

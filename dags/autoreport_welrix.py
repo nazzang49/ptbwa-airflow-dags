@@ -1,4 +1,5 @@
 from airflow import DAG
+from airflow.operators.dummy import DummyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
@@ -64,4 +65,8 @@ with DAG('autoreport_welrix_dag',
         notebook_task=welrix_groupby_stat_sql_task
     )
 
-    welrix_daily_api_run >> welrix_traffic_stat_sql_run >> welrix_groupby_stat_sql_run
+    start_run = DummyOperator(task_id="start")
+
+    end_run = DummyOperator(task_id="end")
+
+    start_run >> welrix_daily_api_run >> welrix_traffic_stat_sql_run >> welrix_groupby_stat_sql_run >> end_run
