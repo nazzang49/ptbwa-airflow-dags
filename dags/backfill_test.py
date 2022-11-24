@@ -38,7 +38,7 @@ with DAG('test_dag',
     ) as dag:
 
     test_run = DatabricksRunNowOperator(
-        job_id='727979755737243',
+        job_id=727979755737243,
         databricks_conn_id='databricks_default',
         notebook_params=notebook_params
     )
