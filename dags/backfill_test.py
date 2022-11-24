@@ -11,17 +11,14 @@ from pendulum.tz.timezone import Timezone
 #     'node_type_id': 'i3.xlarge'
 # }
 
-funble_airb_api_task = {
-    'notebook_path': '/Shared/autoreport/funble/funble-airb',
-}
-
-funble_sql_task = {
-    'notebook_path': '/Shared/autoreport/funble/funble_deduct_report_join',
+test_task = {
+    'notebook_path': '/Shared/airflow/test',
 }
 
 #Define params for Run Now Operator
 notebook_params = {
-    "Variable":5
+    "Variable":5,
+    "test_time": datetime.now()
 }
 
 default_args = {
@@ -34,28 +31,17 @@ default_args = {
 }
 
 with DAG('autoreport_funble_dag',
-    start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval='@daily',
+    start_date=datetime(2022, 11, 23, tzinfo=Timezone("Asia/Seoul")),
+    schedule_interval=None,
     catchup=False,
     default_args=default_args
     ) as dag:
 
-    funble_airb_api_run = DatabricksSubmitRunOperator(
-        task_id='funble_airb_api_task',
+    test_run = DatabricksSubmitRunOperator(
+        task_id='test_task',
         databricks_conn_id='databricks_default',
         existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=funble_airb_api_task
+        notebook_task=test_task
     )
 
-    funble_sql_run = DatabricksSubmitRunOperator(
-        task_id='funble_sql_task',
-        databricks_conn_id='databricks_default',
-        existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
-        notebook_task=funble_sql_task
-    )
-
-    start_run = DummyOperator(task_id="start")
-
-    end_run = DummyOperator(task_id="end")
-
-    start_run >> funble_airb_api_run >> funble_sql_run >> end_run
+    test_run
