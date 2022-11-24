@@ -30,7 +30,7 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_funble_dag',
+with DAG('test_dag',
     start_date=datetime(2022, 11, 23, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval=None,
     catchup=False,
