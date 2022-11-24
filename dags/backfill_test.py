@@ -40,8 +40,9 @@ with DAG('test_dag',
     test_run = DatabricksSubmitRunOperator(
         task_id='test_task',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="0711-132151-yfw708gh",     # All-Purpose Cluster
-        notebook_task=test_task
+        existing_cluster_id="1026-083605-h88ik7f2",     # All-Purpose Cluster
+        notebook_task=test_task,
+        notebook_params=notebook_params
     )
 
     test_run
