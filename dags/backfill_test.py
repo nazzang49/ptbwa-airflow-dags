@@ -37,11 +37,9 @@ with DAG('test_dag',
     default_args=default_args
     ) as dag:
 
-    test_run = DatabricksSubmitRunOperator(
-        task_id='test_task',
+    test_run = DatabricksRunNowOperator(
+        job_id='727979755737243',
         databricks_conn_id='databricks_default',
-        existing_cluster_id="1026-083605-h88ik7f2",     # All-Purpose Cluster
-        notebook_task=test_task,
         notebook_params=notebook_params
     )
 
