@@ -18,7 +18,7 @@ test_task = {
 #Define params for Run Now Operator
 notebook_params = {
     "Variable": "5",
-    "test_time": datetime.now().strftime("%Y-%m-%d")
+    "test_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 }
 
 default_args = {
