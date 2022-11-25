@@ -11,7 +11,7 @@ import json
 def create_notebook_params():
     notebook_params = dict()
     notebook_names = list()
-    base_path = "./"
+    base_path = "/usr/local/airflow/dags" # based on MWAA
     for config_file in os.listdir(base_path):
         notebook_name, file_ext = config_file.split(".")
         if file_ext == "json":
