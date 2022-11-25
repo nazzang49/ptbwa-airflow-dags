@@ -12,18 +12,22 @@ def create_notebook_params():
     notebook_params = dict()
     notebook_names = list()
     base_path = "/usr/local/airflow/dags" # based on MWAA
-    for config_file in os.listdir(base_path):
+    # for config_file in os.listdir(base_path):
 
-        print(os.listdir(base_path))
-        print(config_file)
+    print(os.listdir(base_path))
 
-        notebook_name, file_ext = config_file.split(".")
-        if file_ext == "json":
-            notebook_names.append(notebook_name)
-            with open(os.path.join(base_path, config_file), "r", encoding="utf-8") as f:
-                notebook_params[notebook_name] = json.dumps(json.load(f))
-    notebook_params["notebook_names"] = ",".join(notebook_names)
-    return notebook_params
+    #     print(os.listdir(base_path))
+    #     print(config_file)
+    #
+    #     notebook_name, file_ext = config_file.split(".")
+    #     if file_ext == "json":
+    #         notebook_names.append(notebook_name)
+    #         with open(os.path.join(base_path, config_file), "r", encoding="utf-8") as f:
+    #             notebook_params[notebook_name] = json.dumps(json.load(f))
+    # notebook_params["notebook_names"] = ",".join(notebook_names)
+    # return
+
+# def check_xcom_pull(**con)
 
 default_args = {
     'owner': 'airflow',
@@ -31,7 +35,7 @@ default_args = {
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5)
+    'retry_delay': timedelta(minutes=1)
 }
 
 with DAG('autoreport_washing',
@@ -46,14 +50,15 @@ with DAG('autoreport_washing',
         python_callable=create_notebook_params
     )
 
-    washing_run = DatabricksRunNowOperator(
-        task_id="washing_task",
-        job_id="751730826324009",
-        databricks_conn_id='databricks_default',
-        notebook_params='{{ task_instance.xcom_pull(task_ids="create_notebook_params_task") }}'
-    )
+    # washing_run = DatabricksRunNowOperator(
+    #     task_id="washing_task",
+    #     job_id="751730826324009",
+    #     databricks_conn_id='databricks_default',
+    #     notebook_params='{{ task_instance.xcom_pull(task_ids="create_notebook_params_task") }}'
+    # )
 
     start_run = DummyOperator(task_id="start")
     end_run = DummyOperator(task_id="end")
 
-    start_run >> create_notebook_params_run >> washing_run >> end_run
+    # start_run >> create_notebook_params_run >> washing_run >> end_run
+    start_run >> create_notebook_params_run >>  end_run
