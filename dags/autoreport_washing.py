@@ -8,25 +8,21 @@ from pendulum.tz.timezone import Timezone
 import os
 import json
 
-def create_notebook_params(**context):
-    notebook_params = dict()
-    notebook_names = list()
-    base_path = "/usr/local/airflow/dags" # based on MWAA
-    for config_file in os.listdir(base_path):
-        config = config_file.split(".")
+notebook_params = dict()
+notebook_names = list()
+base_path = "/usr/local/airflow/dags"  # based on MWAA
+for config_file in os.listdir(base_path):
+    config = config_file.split(".")
 
-        if len(config) <= 1:
-            continue
+    if len(config) <= 1:
+        continue
 
-        if config[1] == "json":
-            notebook_names.append(config[0])
-            with open(os.path.join(base_path, config_file), "r", encoding="utf-8") as f:
-                notebook_params[config[0]] = json.dumps(json.load(f))
+    if config[1] == "json":
+        notebook_names.append(config[0])
+        with open(os.path.join(base_path, config_file), "r", encoding="utf-8") as f:
+            notebook_params[config[0]] = json.dumps(json.load(f))
 
-    notebook_params["notebook_names"] = ",".join(notebook_names)
-    return notebook_params
-
-notebook_params = '{{ task_instance.xcom_pull(task_ids="create_notebook_params_task") }}'
+notebook_params["notebook_names"] = ",".join(notebook_names)
 
 default_args = {
     'owner': 'airflow',
@@ -44,11 +40,6 @@ with DAG('autoreport_washing',
     default_args=default_args
     ) as dag:
 
-    create_notebook_params_run = PythonOperator(
-        task_id="create_notebook_params_task",
-        python_callable=create_notebook_params
-    )
-
     washing_run = DatabricksRunNowOperator(
         task_id="washing_task",
         job_id="751730826324009",
@@ -59,4 +50,4 @@ with DAG('autoreport_washing',
     start_run = DummyOperator(task_id="start")
     end_run = DummyOperator(task_id="end")
 
-    start_run >> create_notebook_params_run >> washing_run >> end_run
+    start_run >> washing_run >> end_run
