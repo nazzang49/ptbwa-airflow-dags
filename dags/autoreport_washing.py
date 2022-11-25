@@ -8,13 +8,13 @@ from pendulum.tz.timezone import Timezone
 import os
 import json
 
-def create_notebook_params():
+def create_notebook_params(**context):
     notebook_params = dict()
     notebook_names = list()
     base_path = "/usr/local/airflow/dags" # based on MWAA
     # for config_file in os.listdir(base_path):
 
-    print(os.listdir(base_path))
+    context["task_instance"].xcom_push(key="path", value=os.listdir(base_path))
 
     #     print(os.listdir(base_path))
     #     print(config_file)
@@ -27,7 +27,8 @@ def create_notebook_params():
     # notebook_params["notebook_names"] = ",".join(notebook_names)
     # return
 
-# def check_xcom_pull(**con)
+def check_xcom_pull(**context):
+    context["task_instance"].xcom_pull(task_ids="create_notebook_params_task", key="path")
 
 default_args = {
     'owner': 'airflow',
@@ -50,6 +51,11 @@ with DAG('autoreport_washing',
         python_callable=create_notebook_params
     )
 
+    check_xcom_pull_run = PythonOperator(
+        task_id="check_xcom_pull_run_task",
+        python_callable=check_xcom_pull
+    )
+
     # washing_run = DatabricksRunNowOperator(
     #     task_id="washing_task",
     #     job_id="751730826324009",
@@ -61,4 +67,4 @@ with DAG('autoreport_washing',
     end_run = DummyOperator(task_id="end")
 
     # start_run >> create_notebook_params_run >> washing_run >> end_run
-    start_run >> create_notebook_params_run >>  end_run
+    start_run >> create_notebook_params_run >> check_xcom_pull_run >> end_run
