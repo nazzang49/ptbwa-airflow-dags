@@ -13,6 +13,10 @@ def create_notebook_params():
     notebook_names = list()
     base_path = "/usr/local/airflow/dags" # based on MWAA
     for config_file in os.listdir(base_path):
+
+        print(os.listdir(base_path))
+        print(config_file)
+
         notebook_name, file_ext = config_file.split(".")
         if file_ext == "json":
             notebook_names.append(notebook_name)
