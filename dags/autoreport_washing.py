@@ -9,7 +9,7 @@ import json
 
 notebook_params = dict()
 notebook_names = list()
-base_path = "../configs"
+base_path = "configs"
 for config_file in os.listdir(base_path):
     notebook_name = config_file.split(".")[0]
     notebook_names.append(notebook_name)
