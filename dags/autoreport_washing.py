@@ -9,12 +9,13 @@ import json
 
 notebook_params = dict()
 notebook_names = list()
-base_path = "configs"
+base_path = "./"
 for config_file in os.listdir(base_path):
-    notebook_name = config_file.split(".")[0]
-    notebook_names.append(notebook_name)
-    with open(os.path.join(base_path, config_file), "r", encoding="utf-8") as f:
-        notebook_params[notebook_name] = json.dumps(json.load(f))
+    notebook_name, file_ext = config_file.split(".")
+    if file_ext == "json":
+        notebook_names.append(notebook_name)
+        with open(os.path.join(base_path, config_file), "r", encoding="utf-8") as f:
+            notebook_params[notebook_name] = json.dumps(json.load(f))
 
 notebook_params["notebook_names"] = ",".join(notebook_names)
 
