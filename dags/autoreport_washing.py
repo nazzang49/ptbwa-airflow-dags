@@ -23,6 +23,8 @@ for config_file in os.listdir(base_path):
             notebook_params[config[0]] = json.dumps(json.load(f))
 
 notebook_params["notebook_names"] = ",".join(notebook_names)
+notebook_params["ds"] = '{{ ds }}'
+notebook_params["next_ds"] = '{{ next_ds }}'
 
 default_args = {
     'owner': 'airflow',
@@ -34,10 +36,12 @@ default_args = {
 }
 
 with DAG('autoreport_washing',
-    start_date=datetime(2022, 11, 24, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval=None,
+    start_date=datetime(2022, 11, 28, tzinfo=Timezone("Asia/Seoul")),
+    end_date=datetime(2022, 11, 29, tzinfo=Timezone("Asia/Seoul")),
+    schedule_interval='@hourly',
     catchup=False,
-    default_args=default_args
+    default_args=default_args,
+    # render_template_as_native_obj=True
     ) as dag:
 
     washing_run = DatabricksRunNowOperator(
