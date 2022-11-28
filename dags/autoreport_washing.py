@@ -25,6 +25,8 @@ for config_file in os.listdir(base_path):
 notebook_params["notebook_names"] = ",".join(notebook_names)
 notebook_params["ds"] = '{{ ds }}'
 notebook_params["next_ds"] = '{{ next_ds }}'
+notebook_params["execution_date"] = '{{ execution_date.strftime("%Y-%m-%d %H:%M:%S") }}'
+notebook_params["next_execution_date"] = '{{ next_execution_date.strftime("%Y-%m-%d %H:%M:%S") }}'
 
 default_args = {
     'owner': 'airflow',
