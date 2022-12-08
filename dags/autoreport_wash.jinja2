@@ -4,10 +4,9 @@ from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 
 from jinja2 import Environment, FileSystemLoader
-from custom.operators import AutoReportWashOperator
+from custom.AutoReportWashOperator import AutoReportWashOperator
 from datetime import timedelta
 
 import yaml
@@ -36,35 +35,28 @@ def _get_notebook_params(env):
     :return:
     """
     notebook_params = dict()
-    file_path = f"/usr/local/airflow/dags/kcar_kmt_{env}.json"
+    file_path = f"/usr/local/airflow/dags/{{ advertiser }}_{{ channel }}_{env}.json"
     with open(file_path, "r", encoding="utf-8") as f:
         notebook_params["washing_params"] = json.load(f)
     return notebook_params
-
-check_validation_notebook_task = {
-
-
-
-
-}
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=2)
+    'retries': {{ default_args.retries }},
+    'retry_delay': timedelta(minutes={{ default_args.retry_delay }})
 }
 
-with DAG('autoreport_wash_kcar_kmt',
+with DAG('{{ project }}_{{ is_wash }}_{{ advertiser }}_{{ channel }}',
     start_date=pendulum.datetime(2022, 11, 28, tz="Asia/Seoul"),
     # schedule_interval='0 2 5 * *',
     schedule_interval=None,
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
-    tags=["auto_report", "kcar", "kmt", "wash"]
+    tags=["{{ project }}", "{{ advertiser }}", "{{ channel }}", "{{ is_wash }}"]
     ) as dag:
 
     start = DummyOperator(task_id="start")
@@ -73,27 +65,27 @@ with DAG('autoreport_wash_kcar_kmt',
     get_notebook_params = PythonOperator(
         task_id="get_notebook_params",
         python_callable=_get_notebook_params,
-        op_kwargs={"env": "dev"},
+        op_kwargs={"env": "{{ env }}"},
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
     get_properties = PythonOperator(
         task_id="get_properties",
         python_callable=_get_properties,
-        op_kwargs={"env": "dev"},
+        op_kwargs={"env": "{{ env }}"},
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
     # (!) last_week
-    # with TaskGroup(group_id="wash_group") as tg:
+    # with TaskGroup(group_id="{{ is_wash }}_group") as tg:
     #     auto_report_wash_tasks = []
     #     for i in range(2):
     #         auto_report_wash_tasks.append(
     #             AutoReportWashOperator(
     #                 task_id=f"auto_report_wash_{i}",
     #                 job_id="751730826324009",
-    #                 databricks_conn_id="databricks_default",
-    #                 notebook_params="{{ ti.xcom_pull(task_ids='get_config', key='return_value') }}",
+    #                 databricks_conn_id="{{ databricks_conn_id }}",
+    #                 notebook_params="{{ notebook_params }}",
     #                 n_interval=i,
     #                 d_interval=3
     #             )
@@ -103,30 +95,22 @@ with DAG('autoreport_wash_kcar_kmt',
     #             auto_report_wash_tasks[i - 1] >> auto_report_wash_tasks[i]
 
     # (!) last_month
-    with TaskGroup(group_id="wash_group") as tg:
+    with TaskGroup(group_id="{{ is_wash }}_group") as tg:
         auto_report_wash_tasks = []
         for i in range(10):
             auto_report_wash_tasks.append(
                 AutoReportWashOperator(
                     task_id=f"auto_report_wash_{i}",
-                    job_id="{{ ti.xcom_pull(task_ids='get_properties', key='job_id') }}",
-                    databricks_conn_id="databricks_default",
-                    notebook_params="{{ ti.xcom_pull(task_ids='get_notebook_params', key='return_value') }}",
+                    job_id="{{ job_id }}",
+                    databricks_conn_id="{{ databricks_conn_id }}",
+                    notebook_params="{{ notebook_params }}",
                     trigger_rule=TriggerRule.ALL_DONE,
-                    interval_idx=i,
-                    interval_freq="3D",
+                    n_interval=i,
+                    d_interval=3,
                 )
             )
 
             if i > 0:
                 auto_report_wash_tasks[i - 1] >> auto_report_wash_tasks[i]
 
-    # (!) validation
-    check_validation = DatabricksSubmitRunOperator(
-        task_id="check_validation",
-        databricks_conn_id='databricks_default',
-        existing_cluster_id="0711-132151-yfw708gh",
-        notebook_task=check_validation_notebook_task
-    )
-
-    start >> get_properties >> get_notebook_params >> tg >> check_validation >> end
+    start >> get_properties >> get_notebook_params >> tg >> end

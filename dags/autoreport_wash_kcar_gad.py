@@ -4,7 +4,6 @@ from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
 
 from jinja2 import Environment, FileSystemLoader
 from custom.operators import AutoReportWashOperator
@@ -36,17 +35,10 @@ def _get_notebook_params(env):
     :return:
     """
     notebook_params = dict()
-    file_path = f"/usr/local/airflow/dags/kcar_kmt_{env}.json"
+    file_path = f"/usr/local/airflow/dags/kcar_gad_{env}.json"
     with open(file_path, "r", encoding="utf-8") as f:
         notebook_params["washing_params"] = json.load(f)
     return notebook_params
-
-check_validation_notebook_task = {
-
-
-
-
-}
 
 default_args = {
     'owner': 'airflow',
@@ -57,14 +49,14 @@ default_args = {
     'retry_delay': timedelta(minutes=2)
 }
 
-with DAG('autoreport_wash_kcar_kmt',
+with DAG('autoreport_wash_kcar_gad',
     start_date=pendulum.datetime(2022, 11, 28, tz="Asia/Seoul"),
     # schedule_interval='0 2 5 * *',
     schedule_interval=None,
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
-    tags=["auto_report", "kcar", "kmt", "wash"]
+    tags=["autoreport", "kcar", "gad", "wash"]
     ) as dag:
 
     start = DummyOperator(task_id="start")
@@ -93,7 +85,7 @@ with DAG('autoreport_wash_kcar_kmt',
     #                 task_id=f"auto_report_wash_{i}",
     #                 job_id="751730826324009",
     #                 databricks_conn_id="databricks_default",
-    #                 notebook_params="{{ ti.xcom_pull(task_ids='get_config', key='return_value') }}",
+    #                 notebook_params="{{ti.xcom_pull(task_ids='get_notebook_params', key='return_value')}}",
     #                 n_interval=i,
     #                 d_interval=3
     #             )
@@ -109,9 +101,9 @@ with DAG('autoreport_wash_kcar_kmt',
             auto_report_wash_tasks.append(
                 AutoReportWashOperator(
                     task_id=f"auto_report_wash_{i}",
-                    job_id="{{ ti.xcom_pull(task_ids='get_properties', key='job_id') }}",
+                    job_id="{{ti.xcom_pull(task_ids='get_properties', key='job_id')}}",
                     databricks_conn_id="databricks_default",
-                    notebook_params="{{ ti.xcom_pull(task_ids='get_notebook_params', key='return_value') }}",
+                    notebook_params="{{ti.xcom_pull(task_ids='get_notebook_params', key='return_value')}}",
                     trigger_rule=TriggerRule.ALL_DONE,
                     interval_idx=i,
                     interval_freq="3D",
@@ -121,12 +113,4 @@ with DAG('autoreport_wash_kcar_kmt',
             if i > 0:
                 auto_report_wash_tasks[i - 1] >> auto_report_wash_tasks[i]
 
-    # (!) validation
-    check_validation = DatabricksSubmitRunOperator(
-        task_id="check_validation",
-        databricks_conn_id='databricks_default',
-        existing_cluster_id="0711-132151-yfw708gh",
-        notebook_task=check_validation_notebook_task
-    )
-
-    start >> get_properties >> get_notebook_params >> tg >> check_validation >> end
+    start >> get_properties >> get_notebook_params >> tg >> end

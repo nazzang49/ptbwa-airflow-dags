@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import json
+import pendulum
 
-from logging import Logger
 from datetime import datetime, timedelta
-from typing import Sequence, Optional, Any
+from typing import Sequence, Any
+
+from pytz import *
 from airflow.exceptions import AirflowException
-from airflow.models import BaseOperator, BaseOperatorLink, XCom
+from airflow.models import BaseOperator
 from airflow.models.taskinstance import Context
 from airflow.compat.functools import cached_property
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
 from airflow.providers.databricks.operators.databricks import DatabricksJobRunLink, _handle_databricks_operator_execution
 from airflow.providers.databricks.utils.databricks import normalise_json_content
+from dags.utils import PtbwaUtils
+
+# import AutoReportUtils
 
 import pandas as pd
 
@@ -26,6 +31,16 @@ class AutoReportWashOperator(BaseOperator):
     _WASHING_PRESETS = [
         "last_month",
         "last_week"
+    ]
+
+    _NOTEBOOK_PARAMS = [
+        "washing_params",
+        "interval_s_date",
+        "interval_e_date",
+        "data_interval_start",
+        "data_interval_end",
+        "execution_date",
+        "next_execution_date"
     ]
 
     def __init__(
@@ -47,8 +62,8 @@ class AutoReportWashOperator(BaseOperator):
         databricks_retry_args: dict[Any, Any] | None = None,
         do_xcom_push: bool = True,
         wait_for_termination: bool = True,
-        n_interval: int | None = None,
-        d_interval: int | None = None,
+        interval_idx: int | None = None,
+        interval_freq: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -80,13 +95,13 @@ class AutoReportWashOperator(BaseOperator):
         if idempotency_token is not None:
             self.json['idempotency_token'] = idempotency_token
 
-        if n_interval is None:
+        if interval_idx is None:
             raise AirflowException("[NOT-FOUND]REQUIRED::{n_interval}")
-        if d_interval is None:
+        if interval_freq is None:
             raise AirflowException("[NOT-FOUND]REQUIRED::{d_interval}")
 
-        self.n_interval = n_interval    # i-th of whole interval groups
-        self.d_interval = d_interval    # interval days e.g. 3 means auto increments by 3
+        self.interval_idx = interval_idx          # i-th interval
+        self.interval_freq = interval_freq        # e.g. 3D means [11-01, 11-04, 11-07]
 
         self.json = normalise_json_content(self.json)
         self.run_id: int | None = None
@@ -119,17 +134,16 @@ class AutoReportWashOperator(BaseOperator):
             self.json['job_id'] = job_id
             del self.json['job_name']
 
-        # self.set_date_params(context)
-        self.set_periods(context)
-        self.set_interval()
+        self.set_intervals(context)
+        self.set_current_interval()
         self.set_notebook_params(context)
 
         self.run_id = hook.run_now(self.json)
         _handle_databricks_operator_execution(self, hook, self.log, context)
 
-    def set_periods(self, context: Context):
+    def set_intervals(self, context: Context):
         """
-        A method for creating date-range to do api call group by group
+        A method for creating intervals to do api call on each interval
         :return:
         """
         data_interval_end = context["data_interval_end"].in_timezone("Asia/Seoul").strftime("%Y-%m-%d %H:%M:%S")
@@ -150,23 +164,28 @@ class AutoReportWashOperator(BaseOperator):
             s_date = current_date - timedelta(days=int(s_minus))
             e_date = current_date - timedelta(days=int(e_minus))
 
-        self.s_date = s_date.strftime("%Y-%m-%d")
-        self.e_date = e_date.strftime("%Y-%m-%d")
-        self.periods = pd.date_range(start=self.s_date, end=self.e_date, freq=f"{self.d_interval}D").tolist()
-        self.periods_len = len(self.periods)
+        self.s_date = AutoReportUtils.convert_default_datetime_to_string(s_date)
+        self.e_date = AutoReportUtils.convert_default_datetime_to_string(e_date)
 
-    def set_interval(self):
+        self.intervals = pd.date_range(start=self.s_date, end=self.e_date, freq=self.interval_freq).tolist()
+        self.intervals_len = len(self.intervals)
+
+    def set_current_interval(self):
         """
-        A method for setting current interval in whole periods
+        A method for setting current interval in whole intervals
         :return:
         """
-        self.interval_s_date = self.periods[self.n_interval]
-        if self.n_interval < self.periods_len:
-            self.interval_e_date = self.periods[self.n_interval + 1]
-        elif self.n_interval == self.periods_len:
-            self.interval_e_date = self.e_date
+        washing_params = self.json["notebook_params"]["washing_params"]
+
+        self.interval_s = self.intervals[self.interval_idx]
+        if self.interval_idx < self.intervals_len:
+            self.interval_e = self.intervals[self.interval_idx + 1]
+        elif self.interval_idx == self.intervals_len:
+            self.interval_e = self.e_date
+            if washing_params["washing_preset"] == "last_week":
+                self.interval_e += timedelta(days=1)
         else:
-            raise AirflowException(f"[OUT-OF-RANGE]INTERVAL::{self.n_interval}")
+            raise AirflowException(f"[OUT-OF-RANGE]INTERVAL::{self.interval_idx}")
 
     def set_notebook_params(self, context: Context):
         """
@@ -175,20 +194,11 @@ class AutoReportWashOperator(BaseOperator):
         :return:
         """
         self.json["notebook_params"]["washing_params"] = json.dumps(self.json["notebook_params"]["washing_params"])
-        self.json["notebook_params"]["interval_s_date"] = self.interval_s_date.strftime("%Y-%m-%d")
-        self.json["notebook_params"]["interval_e_date"] = self.interval_e_date.strftime("%Y-%m-%d")
+        self.json["notebook_params"]["interval_s_date"] = AutoReportUtils.convert_pandas_timestamp_to_string(self.interval_s)
+        self.json["notebook_params"]["interval_e_date"] = AutoReportUtils.convert_pandas_timestamp_to_string(self.interval_e)
 
-        self.json["notebook_params"]["data_interval_start"] = \
-            context["data_interval_start"].in_timezone("Asia/Seoul").strftime("%Y-%m-%d %H:%M:%S")
-
-        self.json["notebook_params"]["data_interval_end"] = \
-            context["data_interval_end"].in_timezone("Asia/Seoul").strftime("%Y-%m-%d %H:%M:%S")
-
-        self.json["notebook_params"]["execution_date"] = \
-            context["execution_date"].in_timezone("Asia/Seoul").strftime("%Y-%m-%d %H:%M:%S")
-
-        self.json["notebook_params"]["next_execution_date"] = \
-            context["next_execution_date"].in_timezone("Asia/Seoul").strftime("%Y-%m-%d %H:%M:%S")
+        self.json["notebook_params"]["dis"] = AutoReportUtils.convert_pendulum_datetime_to_string(context["data_interval_start"], time_zone="Asia/Seoul")
+        self.json["notebook_params"]["die"] = AutoReportUtils.convert_pendulum_datetime_to_string(context["data_interval_end"], time_zone="Asia/Seoul")
 
     def on_kill(self):
         if self.run_id:
@@ -200,3 +210,24 @@ class AutoReportWashOperator(BaseOperator):
             self.log.error(
                 'Error: Task: %s with invalid run_id was requested to be cancelled.', self.task_id
             )
+
+class AutoReportUtils:
+    """
+    A class for providing reused-functions
+    """
+    def __init__(self) -> None:
+        super().__init__()
+
+    @staticmethod
+    def convert_default_datetime_to_string(date: datetime, format="%Y-%m-%d", time_zone=None):
+        return date.astimezone(timezone(time_zone)).strftime(format) if time_zone else date.strftime(format)
+
+    @staticmethod
+    def convert_pandas_timestamp_to_string(date: pd.Timestamp, format="%Y-%m-%d", time_zone=None):
+        return date.tz_convert(time_zone).strftime(format) if time_zone else date.strftime(format)
+
+    @staticmethod
+    def convert_pendulum_datetime_to_string(date:pendulum.datetime, format="%Y-%m-%d %H:%M:%S", time_zone=None):
+        return date.in_timezone(time_zone).strftime(format) if time_zone else date.strftime(format)
+
+

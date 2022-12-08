@@ -1,0 +1,11 @@
+env: dev
+databricks_conn_id: databricks_default
+project: autoreport
+advertiser: kcar
+channel: gad
+is_wash: wash
+notebook_params: ti.xcom_pull(task_ids='get_notebook_params', key='return_value')
+job_id: ti.xcom_pull(task_ids='get_properties', key='job_id')
+default_args:
+  retry_delay: 2
+  retries: 1
