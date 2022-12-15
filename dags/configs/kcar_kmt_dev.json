@@ -1,0 +1,8 @@
+{
+    "washing_preset": "last_week",
+    "washing_period": "10|5",
+    "washing_cycle": "monthly",
+    "washing_interval": 10,
+    "washing_day": "5",
+    "notebook_name": "tt-kcar-kmt"
+}

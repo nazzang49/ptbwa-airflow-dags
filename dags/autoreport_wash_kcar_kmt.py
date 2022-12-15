@@ -1,51 +1,73 @@
 import os.path
-
-from airflow import DAG
-from airflow.operators.dummy import DummyOperator
-from airflow.operators.python import PythonOperator
-from airflow.utils.trigger_rule import TriggerRule
-from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
-
-from jinja2 import Environment, FileSystemLoader
-from custom.operators import AutoReportWashOperator
-from datetime import timedelta
-
 import yaml
 import pendulum
 import json
+import pandas as pd
 
+from airflow import DAG, AirflowException
+from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
 from airflow.utils.task_group import TaskGroup
 
-_base_path = "/usr/local/airflow/dags"
+from utils import DagUtils
+from custom.operators import AutoReportWashOperator, AutoReportValidationOperator, Utils
+from datetime import timedelta
+
+_BASE_PATH = "/usr/local/airflow/dags"
 def _get_properties(**kwargs):
     """
     A method for getting common properties from local
-    :return:
     """
     ti = kwargs["ti"]
-    file_path = os.path.join(_base_path, f"properties_{kwargs['env']}.yml")
+    file_path = os.path.join(_BASE_PATH, "properties", f"properties_{kwargs['env']}.yml")
     with open(file_path, "r", encoding="utf-8") as f:
         properties = yaml.load(f, Loader=yaml.FullLoader)
 
     ti.xcom_push(key="job_id", value=str(properties["job_id"]))
-    ti.xcom_push(key="job_name", value=str(properties["job_name"]))
+    ti.xcom_push(key="job_name", value=properties["job_name"])
 
-def _get_notebook_params(env):
+def _get_notebook_params(**kwargs):
     """
     A method for getting notebook params from local
-    :return:
     """
-    notebook_params = dict()
-    file_path = f"/usr/local/airflow/dags/kcar_kmt_{env}.json"
+    ti = kwargs["ti"]
+    file_path = os.path.join(_BASE_PATH, "configs", f"kcar_kmt_{kwargs['env']}.json")
     with open(file_path, "r", encoding="utf-8") as f:
-        notebook_params["washing_params"] = json.load(f)
-    return notebook_params
+        notebook_params = json.load(f)
+
+    ti.xcom_push(key="notebook_params", value=notebook_params)
+
+def _get_total_period(**kwargs):
+    """
+    A method for getting total period before creating intervals
+    """
+    ti = kwargs["ti"]
+    notebook_params = ti.xcom_pull(task_ids='get_notebook_params', key='notebook_params')
+    scope = kwargs.pop("scope")
+    s_date, e_date = Utils.calc_total_period(notebook_params, scope, **kwargs)
+
+    total_period = {
+        "s_date": s_date,
+        "e_date": e_date,
+    }
+
+    print(f"[CHECK-TOTAL-PERIOD]{total_period}")
+    ti.xcom_push(key="total_period", value=total_period)
+
+def _get_validation_args(**kwargs):
+    """
+    A method for validating arguments
+    """
+    ti = kwargs["ti"]
+    base_table_name = "gad_kcar_wash_stat"
+    table_name = f"tt_{base_table_name}" if kwargs["env"] == "dev" else base_table_name
+
+    print(f"[CHECK-VALIDATION-TABLE-NAME]{table_name}")
+    ti.xcom_push(key="table_name", value=table_name)
 
 check_validation_notebook_task = {
-
-
-
-
+    "notebook_path": "/Shared/validation/check-data-validation",
 }
 
 default_args = {
@@ -67,66 +89,77 @@ with DAG('autoreport_wash_kcar_kmt',
     tags=["auto_report", "kcar", "kmt", "wash"]
     ) as dag:
 
+    env = "dev"
+    intervals_len, washing_interval = DagUtils.get_intervals_len(
+        adv="kcar",
+        channel="kmt",
+        env=env
+    )
+
+    if not intervals_len:
+        raise AirflowException("[NOT-FOUND-INTERVALS]REQUIRED::{intervals_len}")
+
     start = DummyOperator(task_id="start")
     end = DummyOperator(task_id="end")
 
     get_notebook_params = PythonOperator(
         task_id="get_notebook_params",
         python_callable=_get_notebook_params,
-        op_kwargs={"env": "dev"},
+        op_kwargs={"env": env},
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
     get_properties = PythonOperator(
         task_id="get_properties",
         python_callable=_get_properties,
-        op_kwargs={"env": "dev"},
+        op_kwargs={"env": env},
+        trigger_rule=TriggerRule.ALL_SUCCESS,
+    )
+
+    get_total_period = PythonOperator(
+        task_id="get_total_period",
+        python_callable=_get_total_period,
+        op_kwargs={"scope": "washing"},
         trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
-    # (!) last_week
-    # with TaskGroup(group_id="wash_group") as tg:
-    #     auto_report_wash_tasks = []
-    #     for i in range(2):
-    #         auto_report_wash_tasks.append(
-    #             AutoReportWashOperator(
-    #                 task_id=f"auto_report_wash_{i}",
-    #                 job_id="751730826324009",
-    #                 databricks_conn_id="databricks_default",
-    #                 notebook_params="{{ ti.xcom_pull(task_ids='get_config', key='return_value') }}",
-    #                 n_interval=i,
-    #                 d_interval=3
-    #             )
-    #         )
-    #
-    #         if i > 0:
-    #             auto_report_wash_tasks[i - 1] >> auto_report_wash_tasks[i]
-
-    # (!) last_month
-    with TaskGroup(group_id="wash_group") as tg:
-        auto_report_wash_tasks = []
-        for i in range(10):
-            auto_report_wash_tasks.append(
-                AutoReportWashOperator(
-                    task_id=f"auto_report_wash_{i}",
-                    job_id="{{ ti.xcom_pull(task_ids='get_properties', key='job_id') }}",
-                    databricks_conn_id="databricks_default",
-                    notebook_params="{{ ti.xcom_pull(task_ids='get_notebook_params', key='return_value') }}",
-                    trigger_rule=TriggerRule.ALL_DONE,
-                    interval_idx=i,
-                    interval_freq="3D",
-                )
+    auto_report_wash_tasks = []
+    for interval_idx in range(intervals_len):
+        auto_report_wash_tasks.append(
+            AutoReportWashOperator(
+                task_id=f"auto_report_wash_{interval_idx}",
+                job_id="{{ ti.xcom_pull(task_ids='get_properties', key='job_id') }}",
+                databricks_conn_id="databricks_default",
+                # trigger_rule=TriggerRule.ALL_DONE,
+                trigger_rule=TriggerRule.ALL_SUCCESS,
+                interval_idx=interval_idx,
+                interval_freq=f"{washing_interval}D",
+                notebook_params="{{ ti.xcom_pull(task_ids='get_notebook_params', key='notebook_params') }}",
+                total_period="{{ ti.xcom_pull(task_ids='get_total_period', key='total_period') }}",
             )
+        )
 
-            if i > 0:
-                auto_report_wash_tasks[i - 1] >> auto_report_wash_tasks[i]
+        if interval_idx == 0:
+            start >> get_properties >> get_notebook_params >> get_total_period >> auto_report_wash_tasks[interval_idx]
+        else:
+            auto_report_wash_tasks[interval_idx - 1] >> auto_report_wash_tasks[interval_idx]
 
-    # (!) validation
-    check_validation = DatabricksSubmitRunOperator(
-        task_id="check_validation",
-        databricks_conn_id='databricks_default',
-        existing_cluster_id="0711-132151-yfw708gh",
-        notebook_task=check_validation_notebook_task
+    get_validation_args = PythonOperator(
+        task_id="get_validation_args",
+        python_callable=_get_validation_args,
+        op_kwargs={"env": env},
+        trigger_rule=TriggerRule.ALL_SUCCESS
     )
 
-    start >> get_properties >> get_notebook_params >> tg >> check_validation >> end
+    check_validation = AutoReportValidationOperator(
+        task_id="check_validation",
+        notebook_task=check_validation_notebook_task,
+        databricks_conn_id='databricks_default',
+        existing_cluster_id="1026-083605-h88ik7f2",
+        # trigger_rule=TriggerRule.ALL_DONE,
+        total_period="{{ ti.xcom_pull(task_ids='get_total_period', key='total_period') }}",
+        table_name="{{ ti.xcom_pull(task_ids='get_validation_args', key='table_name') }}"
+    )
+
+    # start >> get_properties >> get_notebook_params >> get_total_period >> tg >> check_validation >> end
+    auto_report_wash_tasks[-1] >> get_validation_args >> check_validation >> end
