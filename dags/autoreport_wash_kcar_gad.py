@@ -9,7 +9,7 @@ from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
 
-from custom.operators import AutoReportWashOperator, AutoReportValidationOperator, Utils
+from custom.operators import AutoReportWashOperator, AutoReportValidationOperator, WashUtils
 from datetime import timedelta
 
 _BASE_PATH = "/usr/local/airflow/dags"
@@ -30,7 +30,7 @@ def _get_notebook_params(**kwargs):
     A method for getting notebook params from local
     """
     ti = kwargs["ti"]
-    file_path = os.path.join(_BASE_PATH, "configs", f"kcar_gad_{kwargs['env']}.json")
+    file_path = os.path.join(_BASE_PATH, "configs", f"wash_kcar_gad_{kwargs['env']}.json")
     with open(file_path, "r", encoding="utf-8") as f:
         notebook_params = json.load(f)
 
@@ -43,7 +43,7 @@ def _get_total_period(**kwargs):
     ti = kwargs["ti"]
     notebook_params = ti.xcom_pull(task_ids='get_notebook_params', key='notebook_params')
     scope = kwargs.pop("scope")
-    s_date, e_date = Utils.calc_total_period(notebook_params, scope, **kwargs)
+    s_date, e_date = WashUtils.calc_total_period(notebook_params, scope, **kwargs)
 
     total_period = {
         "s_date": s_date,
@@ -65,7 +65,7 @@ def _get_validation_args(**kwargs):
     ]
 
     print(f"[CHECK-VALIDATION-TABLE-NAME]{table_names}")
-    ti.xcom_push(key="table_name", value=",".join(table_names))
+    ti.xcom_push(key="table_names", value=",".join(table_names))
 
 check_validation_notebook_task = {
     "notebook_path": "/Shared/validation/check-data-validation",
@@ -77,7 +77,7 @@ default_args = {
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=2)
+    'retry_delay': timedelta(minutes=1)
 }
 
 with DAG('autoreport_wash_kcar_gad',
@@ -140,7 +140,7 @@ with DAG('autoreport_wash_kcar_gad',
         existing_cluster_id="1026-083605-h88ik7f2",
         # trigger_rule=TriggerRule.ALL_DONE,
         total_period="{{ ti.xcom_pull(task_ids='get_total_period', key='total_period') }}",
-        table_name="{{ ti.xcom_pull(task_ids='get_validation_args', key='table_name') }}"
+        table_names="{{ ti.xcom_pull(task_ids='get_validation_args', key='table_names') }}"
     )
 
     start >> get_properties >> get_notebook_params >> get_total_period >> auto_report_wash >> check_validation >> end

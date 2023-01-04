@@ -7,14 +7,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Sequence, Any
 from enum import Enum
-
+from abc import ABC, abstractmethod
 from pytz import *
 from airflow.exceptions import AirflowException
 from airflow.models import BaseOperator
 from airflow.models.taskinstance import Context
 from airflow.compat.functools import cached_property
 from airflow.providers.databricks.hooks.databricks import DatabricksHook
-from airflow.providers.databricks.operators.databricks import DatabricksJobRunLink, _handle_databricks_operator_execution
+from airflow.providers.databricks.operators.databricks import (
+    DatabricksJobRunLink,
+    _handle_databricks_operator_execution
+)
 from airflow.providers.databricks.utils.databricks import normalise_json_content
 
 class AutoReportTypes(Enum):
@@ -49,7 +52,7 @@ class AutoReportTypes(Enum):
         "notebook_path",
     ]
 
-class Validator:
+class ArgumentValidator:
     """
     A decorator class for validating argument
         checkpoint
@@ -80,13 +83,13 @@ class Validator:
         def inner(*args, **kwargs):
             method_name = function.__name__
             if self.do_pre_validation:
-                Validator._pre_validation(args, method_name)
+                ArgumentValidator._pre_validation(args, method_name)
 
             result = function(*args, **kwargs)
             print(f"[VALIDATION-RESULT]{result}")
 
             if self.do_post_validation:
-                Validator._post_validation(args, method_name)
+                ArgumentValidator._post_validation(args, method_name)
             return result
 
         return inner
@@ -95,30 +98,21 @@ class Validator:
     def _pre_validation(args, method_name):
         """
         A method for validating before running method
-
-        :param args:
-        :param method_name:
-        :return:
         """
-
         for arg in args:
-            if not isinstance(arg, dict) and method_name in Validator._CANDIDATES:
-                Validator._is_empty(arg, method_name)
-                Validator._is_candidate(arg, method_name)
+            if not isinstance(arg, dict) and method_name in ArgumentValidator._CANDIDATES:
+                ArgumentValidator._is_empty(arg, method_name)
+                ArgumentValidator._is_candidate(arg, method_name)
 
     @staticmethod
     def _post_validation(args, method_name):
         """
         A method for validating after running method
-
-        :param args:
-        :param method_name:
-        :return:
         """
         for arg in args:
-            if isinstance(arg, dict) and method_name in Validator._REQUIRED:
-                Validator._is_required(arg, method_name)
-                Validator._is_valid_type(arg, method_name, str)
+            if isinstance(arg, dict) and method_name in ArgumentValidator._REQUIRED:
+                ArgumentValidator._is_required(arg, method_name)
+                ArgumentValidator._is_valid_type(arg, method_name, str)
 
     @staticmethod
     def _is_empty(arg, method_name):
@@ -129,27 +123,30 @@ class Validator:
 
     @staticmethod
     def _is_candidate(arg, method_name):
-        if arg not in Validator._CANDIDATES[method_name]:
+        if arg not in ArgumentValidator._CANDIDATES[method_name]:
             raise AirflowException(
-                f"[NOT-FOUND-KEY(CANDIDATE)]METHOD::{method_name}|ARG::{arg}|CANDIDATES::{Validator._CANDIDATES[method_name]}"
+                f"[NOT-FOUND-KEY(CANDIDATE)]"
+                f"METHOD::{method_name}|ARG::{arg}|CANDIDATES::{ArgumentValidator._CANDIDATES[method_name]}"
             )
 
     @staticmethod
     def _is_required(arg: dict, method_name):
-        for req_key in Validator._REQUIRED[method_name]:
+        for req_key in ArgumentValidator._REQUIRED[method_name]:
             if req_key not in arg:
                 raise AirflowException(
-                    f"[NOT-FOUND-KEY(REQUIRED)]METHOD::{method_name}|ARG::{arg}|CANDIDATES::{Validator._REQUIRED[method_name]}"
+                    f"[NOT-FOUND-KEY(REQUIRED)]"
+                    f"METHOD::{method_name}|ARG::{arg}|CANDIDATES::{ArgumentValidator._REQUIRED[method_name]}"
                 )
 
     @staticmethod
     def _is_valid_type(arg: dict, method_name, value_type=None):
         for key in arg.keys():
             if isinstance(arg[key], dict):
-                Validator._is_valid_type(arg[key], method_name, value_type)
+                ArgumentValidator._is_valid_type(arg[key], method_name, value_type)
             elif not isinstance(arg[key], value_type):
                 raise AirflowException(
-                    f"[INVALID-TYPE]METHOD::{method_name}|ARG::{arg}|CANDIDATES::{Validator._REQUIRED[method_name]}|VALUE-TYPE::{value_type}"
+                    f"[INVALID-TYPE]"
+                    f"METHOD::{method_name}|ARG::{arg}|CANDIDATES::{ArgumentValidator._REQUIRED[method_name]}|VALUE-TYPE::{value_type}"
                 )
 
 class AutoReportWashOperator(BaseOperator):
@@ -253,20 +250,13 @@ class AutoReportWashOperator(BaseOperator):
         A method for executing databricks run-now with custom logic
         """
         hook = self._hook
-        if 'job_name' in self.json:
-            job_id = hook.find_job_id_by_name(self.json['job_name'])
-            if job_id is None:
-                raise AirflowException(f"Job ID for job name {self.json['job_name']} can not be found")
-            self.json['job_id'] = job_id
-            del self.json['job_name']
-
         notebook_params = self.json["notebook_params"]
         total_period = self.json["total_period"]
         total_period["s_date"] = pd.Timestamp(total_period["s_date"])
         total_period["e_date"] = pd.Timestamp(total_period["e_date"])
 
         if self.is_interval:
-            interval_groups = self.set_intervals(total_period)
+            interval_groups = self.set_interval_groups(total_period)
             interval_s = interval_groups[self.interval_idx][0]
             interval_e = interval_groups[self.interval_idx][1]
 
@@ -281,7 +271,7 @@ class AutoReportWashOperator(BaseOperator):
         self.run_id = hook.run_now(self.json)
         _handle_databricks_operator_execution(self, hook, self.log, context)
 
-    def set_intervals(self, total_period: dict):
+    def set_interval_groups(self, total_period: dict):
         intervals = pd.date_range(
             start=total_period["s_date"],
             end=total_period["e_date"],
@@ -290,21 +280,13 @@ class AutoReportWashOperator(BaseOperator):
         intervals = list(intervals)
         n_interval_freq = int(self.interval_freq[0])
 
-
-        # ======================== use generator ========================
-
-
-        # last_interval = Utils.convert_pandas_timestamp_to_str(intervals[-1])
-        # if total_period["e_date"] == last_interval:
-        #     intervals = intervals[:-1]  # delete last interval
-
         interval_groups = [
             [interval, interval + timedelta(days=n_interval_freq)] for interval in intervals
         ]
         interval_groups[-1][1] = total_period["e_date"]  # last group
         return interval_groups
 
-    @Validator(do_pre_validation=False, do_post_validation=True)
+    @ArgumentValidator(do_pre_validation=False, do_post_validation=True)
     def set_notebook_params(self, interval_s: pd.Timestamp, interval_e: pd.Timestamp, notebook_params: dict, **kwargs):
         """
         A method for setting notebook params as string-value
@@ -315,14 +297,14 @@ class AutoReportWashOperator(BaseOperator):
 
         notebook_params.clear()
         notebook_params["washing_params"] = json.dumps(washing_params)
-        notebook_params["interval_s"] = Utils.convert_pandas_timestamp_to_str(interval_s)
-        notebook_params["interval_e"] = Utils.convert_pandas_timestamp_to_str(interval_e)
+        notebook_params["interval_s"] = WashUtils.convert_pandas_timestamp_to_str(interval_s)
+        notebook_params["interval_e"] = WashUtils.convert_pandas_timestamp_to_str(interval_e)
 
-        notebook_params["data_interval_start"] = Utils.convert_pendulum_datetime_to_str(
+        notebook_params["data_interval_start"] = WashUtils.convert_pendulum_datetime_to_str(
             kwargs["data_interval_start"],
             time_zone="Asia/Seoul"
         )
-        notebook_params["data_interval_end"] = Utils.convert_pendulum_datetime_to_str(
+        notebook_params["data_interval_end"] = WashUtils.convert_pendulum_datetime_to_str(
             kwargs["data_interval_end"],
             time_zone="Asia/Seoul"
         )
@@ -373,7 +355,9 @@ class AutoReportValidationOperator(BaseOperator):
         wait_for_termination: bool = True,
         git_source: dict[str, str] | None = None,
         total_period: dict[str, str] | None = None,
-        table_name: str | None = None,
+        table_names: str | None = None,
+        env: str | None = None,
+        project: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -425,11 +409,13 @@ class AutoReportValidationOperator(BaseOperator):
 
         if total_period is None:
             raise AirflowException("[NOT-FOUND]REQUIRED::{total_period}")
-        if table_name is None:
+        if table_names is None:
             raise AirflowException("[NOT-FOUND]REQUIRED::{table_name}")
 
         self.json["total_period"] = total_period
-        self.json["table_name"] = table_name
+        self.json["table_names"] = table_names
+        self.env = env or "dev"
+        self.project = project or "AUTOREPORT_TEST"
 
         self.json = normalise_json_content(self.json)
         self.run_id: int | None = None
@@ -458,17 +444,19 @@ class AutoReportValidationOperator(BaseOperator):
         self.run_id = self._hook.submit_run(self.json)
         _handle_databricks_operator_execution(self, self._hook, self.log, context)
 
-    @Validator(do_pre_validation=False, do_post_validation=True)
+    @ArgumentValidator(do_pre_validation=False, do_post_validation=True)
     def set_base_params(self, notebook_task: dict, **kwargs):
         notebook_task["base_parameters"] = {
             "s_date": self.json["total_period"]["s_date"],
             "e_date": self.json["total_period"]["e_date"],
-            "table_name": self.json["table_name"],
-            "data_interval_start": Utils.convert_pendulum_datetime_to_str(
+            "env": self.env,
+            "project": self.project,
+            "table_names": self.json["table_names"],
+            "data_interval_start": WashUtils.convert_pendulum_datetime_to_str(
                 kwargs["data_interval_start"],
                 time_zone="Asia/Seoul"
             ),
-            "data_interval_end": Utils.convert_pendulum_datetime_to_str(
+            "data_interval_end": WashUtils.convert_pendulum_datetime_to_str(
                 kwargs["data_interval_end"],
                 time_zone="Asia/Seoul"
             ),
@@ -485,50 +473,7 @@ class AutoReportValidationOperator(BaseOperator):
                 'Error: Task: %s with invalid run_id was requested to be cancelled.', self.task_id
             )
 
-
-class Utils:
-    """
-    A class for providing reused-functions especially in custom-operators
-    """
-    def __init__(self) -> None:
-        super().__init__()
-
-    @staticmethod
-    @Validator(do_pre_validation=True, do_post_validation=False)
-    def calc_total_period(notebook_params: dict, scope: str, **kwargs) -> [str, str]:
-        """
-        A method for setting whole intervals
-        :return:
-        """
-        current_date = Utils.convert_pendulum_datetime_to_str(kwargs["data_interval_end"])
-        current_date = Utils.convert_str_to_datetime(current_date[:10])
-
-        print("notebook-params : ", notebook_params)
-
-        washing_preset = notebook_params["washing_preset"]
-        washing_period = notebook_params["washing_period"]
-
-        if washing_preset:
-            if washing_preset == AutoReportTypes.LAST_MONTH.value:
-                s_date = Utils.get_first_day_of_last_month(current_date)
-                e_date = Utils.get_first_day_of_this_month(current_date)
-            elif washing_preset == AutoReportTypes.LAST_WEEK.value:
-                s_date = Utils.get_first_day_of_last_week(current_date)
-                e_date = Utils.get_first_day_of_this_week(current_date)
-            else:
-                raise AirflowException(
-                    f"[INVALID-VALUE]WASHING-PRESET-CANDIDATES::{AutoReportTypes.WASHING_PRESETS.value}|SCOPES::{scope}"
-                )
-        else:
-            s_minus, e_minus = washing_period.split("|")
-            s_date = Utils.get_date_of_period(current_date, int(s_minus))
-            e_date = Utils.get_date_of_period(current_date, int(e_minus))
-
-        # (!) datetime is not serializable in xcom_push
-        s_date = Utils.convert_default_datetime_to_str(s_date)
-        e_date = Utils.convert_default_datetime_to_str(e_date)
-
-        return s_date, e_date
+class BaseUtils(ABC):
 
     @staticmethod
     def get_date_of_period(current_date: datetime, d_minus: int) -> datetime:
@@ -565,3 +510,89 @@ class Utils:
     @staticmethod
     def convert_str_to_datetime(date: str, format="%Y-%m-%d"):
         return datetime.strptime(date, format)
+
+    @staticmethod
+    def calc_total_period():
+        pass
+
+class WashUtils(BaseUtils):
+    """
+    A class for providing reused-functions especially in custom-operators
+    scope :: wash
+    """
+    def __init__(self) -> None:
+        super().__init__()
+
+    @staticmethod
+    @ArgumentValidator(do_pre_validation=True, do_post_validation=False)
+    def calc_total_period(notebook_params: dict, scope: str, **kwargs) -> [str, str]:
+        """
+        A method for calculating total period
+        """
+        data_interval_end = kwargs["data_interval_end"]
+        current_date = WashUtils.convert_pendulum_datetime_to_str(data_interval_end)
+        current_date = WashUtils.convert_str_to_datetime(current_date[:10])
+
+        try:
+            washing_preset = notebook_params["washing_preset"]
+            washing_period = notebook_params["washing_period"]
+        except KeyError:
+            raise AirflowException(f"[NOT-FOUND-DAILY-PERIOD]REQUIRED|SCOPE::{scope}|DATA-INTERVAL-END::{data_interval_end}")
+        except Exception as e:
+            raise AirflowException(f"[UNKNOWN-EXCEPTION]{e}|SCOPE::{scope}|DATA-INTERVAL-END::{data_interval_end}")
+
+        if washing_preset:
+            if washing_preset == AutoReportTypes.LAST_MONTH.value:
+                s_date = WashUtils.get_first_day_of_last_month(current_date)
+                e_date = WashUtils.get_first_day_of_this_month(current_date)
+            elif washing_preset == AutoReportTypes.LAST_WEEK.value:
+                s_date = WashUtils.get_first_day_of_last_week(current_date)
+                e_date = WashUtils.get_first_day_of_this_week(current_date)
+            else:
+                raise AirflowException(
+                    f"[INVALID-WASHING-PRESETS]CANDIDATES::{AutoReportTypes.WASHING_PRESETS.value}|SCOPES::{scope}"
+                )
+        else:
+            s_minus, e_minus = washing_period.split("|")
+            s_date = WashUtils.get_date_of_period(current_date, int(s_minus))
+            e_date = WashUtils.get_date_of_period(current_date, int(e_minus))
+
+        # (!) datetime is not serializable in xcom_push
+        s_date = WashUtils.convert_default_datetime_to_str(s_date)
+        e_date = WashUtils.convert_default_datetime_to_str(e_date)
+
+        return s_date, e_date
+
+class DailyUtils(BaseUtils):
+    """
+    A class for providing reused-functions especially in custom-operators
+    scope :: daily
+    """
+    def __init__(self) -> None:
+        super().__init__()
+
+    @staticmethod
+    @ArgumentValidator(do_pre_validation=True, do_post_validation=False)
+    def calc_total_period(notebook_params: dict, scope: str, **kwargs) -> [str, str]:
+        """
+        A method for calculating total period
+        """
+        data_interval_end = kwargs["data_interval_end"]
+        current_date = DailyUtils.convert_pendulum_datetime_to_str(data_interval_end)
+        current_date = DailyUtils.convert_str_to_datetime(current_date[:10])
+
+        try:
+            s_minus, e_minus = notebook_params["daily_period"].split("|")
+        except KeyError:
+            raise AirflowException(f"[NOT-FOUND-DAILY-PERIOD]REQUIRED|SCOPE::{scope}|DATA-INTERVAL-END::{data_interval_end}")
+        except Exception as e:
+            raise AirflowException(f"[UNKNOWN-EXCEPTION]{e}|SCOPE::{scope}|DATA-INTERVAL-END::{data_interval_end}")
+
+        s_date = DailyUtils.get_date_of_period(current_date, int(s_minus))
+        e_date = DailyUtils.get_date_of_period(current_date, int(e_minus))
+
+        # (!) datetime is not serializable in xcom_push
+        s_date = DailyUtils.convert_default_datetime_to_str(s_date)
+        e_date = DailyUtils.convert_default_datetime_to_str(e_date)
+
+        return s_date, e_date
