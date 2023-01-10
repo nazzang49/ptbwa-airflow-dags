@@ -18,16 +18,13 @@ def _get_notebook_params(**kwargs):
     A method for getting notebook params
     """
     ti = kwargs["ti"]
-    file_path = os.path.join(_BASE_PATH, "configs", f"daily_kcar_{kwargs['env']}.json")
+    file_path = os.path.join(_BASE_PATH, "configs", f"daily_kakaopay_{kwargs['env']}.json")
     with open(file_path, "r", encoding="utf-8") as f:
         notebook_params = json.load(f)
 
-    job_ids = []
     for channel, job_id in notebook_params["job_id"].items():
-        job_ids.append(job_id)
         ti.xcom_push(key=f"{channel}_job_id", value=job_id)
 
-    ti.xcom_push(key="job_ids", value=",".join(job_ids))
     ti.xcom_push(key="notebook_params", value=notebook_params)
 
 def _get_validation_config(**kwargs):
@@ -43,11 +40,7 @@ def _get_validation_config(**kwargs):
     ti.xcom_push(key="validation_config", value=validation_config)
 
     table_names = [
-        "gad_kcar_general_stats",
-        "gad_kcar_keyword_stats",
-
-        # "gad_kcar_keyword_stat",
-        # "gad_kcar_keyword_stat",
+        "fb_kakaopay_ad_stats",
     ]
 
     print(f"[CHECK-VALIDATION-TABLE-NAME]{table_names}")
@@ -65,8 +58,7 @@ def _get_update_jobs_config(**kwargs):
     update_jobs_config["base_parameters"] = {
         "env": kwargs["env"],
         "project": "autoreport",
-        "advertisers": "kcar",
-        "job_ids": ti.xcom_pull(task_ids='get_notebook_params', key='job_ids')
+        "advertisers": "kakaopay"
     }
 
     print(f"[CHECK-UPDATE-JOBS-CONFIG]{update_jobs_config}")
@@ -116,13 +108,13 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=2)
 }
-with DAG('autoreport_kcar_dag',
+with DAG('autoreport_kakaopay_dag',
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval=None,
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
-    tags=["auto_report", "kcar", "all", "daily"]
+    tags=["auto_report", "kakaopay", "all", "daily"]
     ) as dag:
 
     env = "dev"
@@ -171,17 +163,8 @@ with DAG('autoreport_kcar_dag',
     )
 
     with TaskGroup(group_id="main_tasks") as main_tasks:
-        kcar_gsh_api = DatabricksRunNowOperator(
-            task_id="kcar_gsh_api",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gsh_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
-        kcar_gad_api = DatabricksRunNowOperator(
-            task_id="kcar_gad_api",
+        kakaopay_gad_api = DatabricksRunNowOperator(
+            task_id="kakaopay_gad_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gad_job_id') }}",
             notebook_params={
                 "env": env
@@ -189,43 +172,44 @@ with DAG('autoreport_kcar_dag',
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
 
-        kcar_kmt_api = DatabricksRunNowOperator(
-            task_id="kcar_kmt_api",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='kmt_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
+        # kakaopay_fb_api_run = DatabricksSubmitRunOperator(
+        #     task_id='kakaopay_fb_api_task',
+        #     databricks_conn_id='databricks_default',
+        #     existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        #     notebook_task=kakaopay_fb_api_task
+        # )
+        #
+        # kakaopay_gad_ono_api_run = DatabricksSubmitRunOperator(
+        #     task_id='kakaopay_gad_ono_api_task',
+        #     databricks_conn_id='databricks_default',
+        #     existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        #     notebook_task=kakaopay_gad_ono_api_task
+        # )
+        #
+        # kakaopay_gad_search_api_run = DatabricksSubmitRunOperator(
+        #     task_id='kakaopay_gad_search_api_task',
+        #     databricks_conn_id='databricks_default',
+        #     existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        #     notebook_task=kakaopay_gad_search_api_task
+        # )
+        #
+        # kakaopay_kmt_api_run = DatabricksSubmitRunOperator(
+        #     task_id='kakaopay_kmt_api_task',
+        #     databricks_conn_id='databricks_default',
+        #     existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        #     notebook_task=kakaopay_kmt_api_task
+        # )
+        #
+        # kakaopay_kmt_keyword_api_run = DatabricksSubmitRunOperator(
+        #     task_id='kakaopay_kmt_keyword_api_task',
+        #     databricks_conn_id='databricks_default',
+        #     existing_cluster_id="0711-132151-yfw708gh",  # All-Purpose Cluster
+        #     notebook_task=kakaopay_kmt_keyword_api_task
+        # )
+        #
+        # [kakaopay_free_api, kakaopay_gsh_api, kakaopay_gad_api, kakaopay_kmt_api, kakaopay_nsa_api] >> kakaopay_report_stat_sql
 
-        kcar_nsa_api = DatabricksRunNowOperator(
-            task_id="kcar_nsa_api",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='nsa_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
-        kcar_free_api = DatabricksRunNowOperator(
-            task_id="kcar_free_api",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='free_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
-        kcar_report_stat_sql = DatabricksRunNowOperator(
-            task_id="kcar_report_stat_sql",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='report_stat_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
-        [kcar_free_api, kcar_gsh_api, kcar_gad_api, kcar_kmt_api, kcar_nsa_api] >> kcar_report_stat_sql
+        kakaopay_gad_api
 
     check_env_after_main_tasks = BranchPythonOperator(
         task_id="check_env_after_main_tasks",
