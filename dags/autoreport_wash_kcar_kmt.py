@@ -82,7 +82,7 @@ default_args = {
     'retry_delay': timedelta(minutes=1)
 }
 
-with DAG('autoreport_wash_kcar_kmt',
+with DAG(os.path.basename(__file__).replace(".py", ""),
     start_date=pendulum.datetime(2022, 11, 28, tz="Asia/Seoul"),
     # schedule_interval='0 2 5 * *',
     schedule_interval=None,

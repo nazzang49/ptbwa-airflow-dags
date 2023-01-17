@@ -1,3 +1,5 @@
+import os
+
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.providers.databricks.operators.databricks import DatabricksSubmitRunOperator, DatabricksRunNowOperator
@@ -41,7 +43,7 @@ default_args = {
     'retry_delay': timedelta(minutes=3)
 }
 
-with DAG('autoreport_ministock_dag',
+with DAG(os.path.basename(__file__).replace(".py", ""),
     start_date=datetime(2022, 10, 17, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval='@daily',
     catchup=False,

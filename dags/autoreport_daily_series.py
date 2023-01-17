@@ -113,7 +113,7 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=2)
 }
-with DAG('autoreport_series_dag',
+with DAG(os.path.basename(__file__).replace(".py", ""),
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval="0 18 * * *",
     catchup=False,

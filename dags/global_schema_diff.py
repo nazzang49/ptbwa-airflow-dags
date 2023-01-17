@@ -31,7 +31,7 @@ default_args = {
     'retry_delay': timedelta(minutes=2)
 }
 
-with DAG('global_schema_diff',
+with DAG(os.path.basename(__file__).replace(".py", ""),
     start_date=datetime(2023, 1, 4, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval="@daily",
     catchup=False,
