@@ -115,7 +115,7 @@ default_args = {
 }
 with DAG('autoreport_series_dag',
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval=None,
+    schedule_interval="0 18 * * *",
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
