@@ -4,6 +4,7 @@ import json
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator, BranchPythonOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.databricks.operators.databricks import DatabricksRunNowOperator, DatabricksSubmitRunOperator
 from datetime import datetime, timedelta
 
@@ -22,12 +23,14 @@ def _get_notebook_params(**kwargs):
     with open(file_path, "r", encoding="utf-8") as f:
         notebook_params = json.load(f)
 
-    job_ids = []
-    for channel, job_id in notebook_params["job_id"].items():
-        job_ids.append(job_id)
+    for channel, job_id in notebook_params["job_id"]["api"].items():
         ti.xcom_push(key=f"{channel}_job_id", value=job_id)
 
-    ti.xcom_push(key="job_ids", value=",".join(job_ids))
+    for channel, job_id in notebook_params["job_id"]["sql"].items():
+        ti.xcom_push(key=f"{channel}_job_id", value=job_id)
+
+    ti.xcom_push(key="api_job_ids", value=",".join([job_id for job_id in notebook_params["job_id"]["api"].values()]))
+    ti.xcom_push(key="sql_job_ids", value=",".join([job_id for job_id in notebook_params["job_id"]["sql"].values()]))
     ti.xcom_push(key="notebook_params", value=notebook_params)
 
 def _get_validation_config(**kwargs):
@@ -63,7 +66,7 @@ def _get_update_jobs_config(**kwargs):
         "env": kwargs["env"],
         "project": "autoreport",
         "advertisers": "series",
-        "job_ids": ti.xcom_pull(task_ids='get_notebook_params', key='job_ids')
+        "job_ids": ti.xcom_pull(task_ids='get_notebook_params', key=f'{kwargs["dag_type"]}_job_ids')
     }
 
     print(f"[CHECK-UPDATE-JOBS-CONFIG]{update_jobs_config}")
@@ -113,14 +116,18 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=2)
 }
-with DAG(os.path.basename(__file__).replace(".py", ""),
+
+################################### API ###################################
+
+
+with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
     schedule_interval="0 18 * * *",
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
     tags=["auto_report", "series", "all", "daily"]
-    ) as dag:
+    ) as dag_api:
 
     env = "dev"
     project = "autoreport"
@@ -146,7 +153,10 @@ with DAG(os.path.basename(__file__).replace(".py", ""),
         get_update_jobs_config = PythonOperator(
             task_id="get_update_jobs_config",
             python_callable=_get_update_jobs_config,
-            op_kwargs={"env": env},
+            op_kwargs={
+                "env": env,
+                "dag_type": "api"
+            },
             trigger_rule=TriggerRule.ALL_SUCCESS,
         )
 
@@ -168,22 +178,6 @@ with DAG(os.path.basename(__file__).replace(".py", ""),
     )
 
     with TaskGroup(group_id="main_tasks") as main_tasks:
-        # @dongseok.lee
-        # series_ad_api = DatabricksRunNowOperator(
-        #     task_id="series_ad_api",
-        #     job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='ad_job_id') }}",
-        #     trigger_rule=TriggerRule.ALL_SUCCESS
-        # )
-
-        series_ad_stat_sql = DatabricksRunNowOperator(
-            task_id="series_ad_stat_sql",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='ad_stat_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
         series_gad_api = DatabricksRunNowOperator(
             task_id="series_gad_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gad_job_id') }}",
@@ -193,26 +187,14 @@ with DAG(os.path.basename(__file__).replace(".py", ""),
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
 
-        with TaskGroup(group_id="fb_tasks") as fb_tasks:
-            series_fb_api = DatabricksRunNowOperator(
-                task_id="series_fb_api",
-                job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='fb_job_id') }}",
-                notebook_params={
-                    "env": env
-                },
-                trigger_rule=TriggerRule.ALL_SUCCESS
-            )
-
-            series_fb_postprocess_api = DatabricksRunNowOperator(
-                task_id="series_fb_postprocess_api",
-                job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='fb_postprocess_job_id') }}",
-                notebook_params={
-                    "env": env
-                },
-                trigger_rule=TriggerRule.ALL_SUCCESS
-            )
-
-            series_fb_api >> series_fb_postprocess_api
+        series_fb_api = DatabricksRunNowOperator(
+            task_id="series_fb_api",
+            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='fb_job_id') }}",
+            notebook_params={
+                "env": env
+            },
+            trigger_rule=TriggerRule.ALL_SUCCESS
+        )
 
         series_twt_api = DatabricksRunNowOperator(
             task_id="series_twt_api",
@@ -250,26 +232,7 @@ with DAG(os.path.basename(__file__).replace(".py", ""),
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
 
-        series_report_join_api = DatabricksRunNowOperator(
-            task_id="series_report_join_sql",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='report_join_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
-        series_report_stat_api = DatabricksRunNowOperator(
-            task_id="series_report_stat_sql",
-            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='report_stat_job_id') }}",
-            notebook_params={
-                "env": env
-            },
-            trigger_rule=TriggerRule.ALL_SUCCESS
-        )
-
-        series_ad_stat_sql >> [series_gad_api, series_tik_api, series_twt_api, series_asa_api, fb_tasks, series_twt_org_api]
-        [series_gad_api, series_tik_api, series_twt_api, series_asa_api, fb_tasks, series_twt_org_api] >> series_report_join_api >> series_report_stat_api
+        [series_gad_api, series_tik_api, series_twt_api, series_asa_api, series_fb_api, series_twt_org_api]
 
     check_env_after_main_tasks = BranchPythonOperator(
         task_id="check_env_after_main_tasks",
@@ -283,7 +246,188 @@ with DAG(os.path.basename(__file__).replace(".py", ""),
         get_update_jobs_config = PythonOperator(
             task_id="get_update_jobs_config",
             python_callable=_get_update_jobs_config,
-            op_kwargs={"env": "prod"},
+            op_kwargs={
+                "env": "prod",
+                "dag_type": "api"
+            },
+            trigger_rule=TriggerRule.NONE_SKIPPED,
+        )
+
+        update_jobs = DatabricksSubmitRunOperator(
+            task_id="update_jobs",
+            trigger_rule=TriggerRule.NONE_SKIPPED,
+            databricks_conn_id='databricks_default',
+            existing_cluster_id="1026-083605-h88ik7f2",
+            notebook_task="{{ ti.xcom_pull(task_ids='update_jobs_from_dev_to_prod.get_update_jobs_config', key='update_jobs_config') }}"
+        )
+
+        get_update_jobs_config >> update_jobs
+
+    with TaskGroup(group_id="validation_tasks") as validation_tasks:
+        get_validation_config = PythonOperator(
+            task_id="get_validation_config",
+            python_callable=_get_validation_config,
+            op_kwargs={"env": env},
+            trigger_rule=TriggerRule.ALL_SUCCESS,
+        )
+
+        check_validation = AutoReportValidationOperator(
+            task_id="check_validation",
+            notebook_task="{{ ti.xcom_pull(task_ids='validation_tasks.get_validation_config', key='validation_config') }}",
+            databricks_conn_id='databricks_default',
+            existing_cluster_id="1026-083605-h88ik7f2",
+            trigger_rule=TriggerRule.ALL_SUCCESS,
+            total_period="{{ ti.xcom_pull(task_ids='get_total_period', key='total_period') }}",
+            table_names="{{ ti.xcom_pull(task_ids='validation_tasks.get_validation_config', key='table_names') }}",
+            project="AUTOREPORT" if env == "prod" else "AUTOREPORT_TEST"
+        )
+
+        get_validation_config >> check_validation
+
+    trigger_sql_dag = TriggerDagRunOperator(
+        task_id="trigger_sql_dag",
+        trigger_dag_id=f"{os.path.basename(__file__).replace('.py', '')}_sql",
+        trigger_run_id=None,
+        execution_date=None,
+        reset_dag_run=False,
+        wait_for_completion=False,
+        # poke_interval=60,
+        allowed_states=["success"],
+        failed_states=None,
+    )
+
+    # dev
+    update_jobs_from_prod_to_dev >> main_tasks
+    update_jobs_from_dev_to_prod >> validation_tasks
+
+    # common
+    start >> get_notebook_params >> get_total_period >> check_env_before_main_tasks >> [update_jobs_from_prod_to_dev, main_tasks]
+    main_tasks >> check_env_after_main_tasks >> [update_jobs_from_dev_to_prod, validation_tasks]
+    validation_tasks >> trigger_sql_dag >> end
+
+
+################################### SQL ###################################
+
+
+with DAG(f"{os.path.basename(__file__).replace('.py', '')}_sql",
+    start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
+    schedule_interval=None,
+    catchup=False,
+    default_args=default_args,
+    render_template_as_native_obj=True,
+    tags=["auto_report", "series", "all", "daily"]
+    ) as dag_sql:
+
+    env = "dev"
+    project = "autoreport"
+
+    start = DummyOperator(task_id="start")
+    end = DummyOperator(task_id="end")
+
+    get_notebook_params = PythonOperator(
+        task_id="get_notebook_params",
+        python_callable=_get_notebook_params,
+        op_kwargs={"env": env},
+        trigger_rule=TriggerRule.ALL_SUCCESS,
+    )
+
+    check_env_before_main_tasks = BranchPythonOperator(
+        task_id="check_env_before_main_tasks",
+        python_callable=_check_env_before_main_tasks,
+        op_kwargs={"env": env},
+        trigger_rule=TriggerRule.ALL_SUCCESS
+    )
+
+    with TaskGroup(group_id="update_jobs_from_prod_to_dev") as update_jobs_from_prod_to_dev:
+        get_update_jobs_config = PythonOperator(
+            task_id="get_update_jobs_config",
+            python_callable=_get_update_jobs_config,
+            op_kwargs={
+                "env": env,
+                "dag_type": "sql"
+            },
+            trigger_rule=TriggerRule.ALL_SUCCESS,
+        )
+
+        update_jobs = DatabricksSubmitRunOperator(
+            task_id="update_jobs",
+            trigger_rule=TriggerRule.ALL_SUCCESS,
+            databricks_conn_id='databricks_default',
+            existing_cluster_id="1026-083605-h88ik7f2",
+            notebook_task="{{ ti.xcom_pull(task_ids='update_jobs_from_prod_to_dev.get_update_jobs_config', key='update_jobs_config') }}"
+        )
+
+        get_update_jobs_config >> update_jobs
+
+    get_total_period = PythonOperator(
+        task_id="get_total_period",
+        python_callable=_get_total_period,
+        op_kwargs={"scope": "daily"},
+        trigger_rule=TriggerRule.ALL_SUCCESS
+    )
+
+    with TaskGroup(group_id="main_tasks") as main_tasks:
+        # @dongseok.lee
+        series_ad_api = DatabricksRunNowOperator(
+            task_id="series_ad_api",
+            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='ad_job_id') }}",
+            trigger_rule=TriggerRule.ALL_SUCCESS
+        )
+
+        series_ad_stat_sql = DatabricksRunNowOperator(
+            task_id="series_ad_stat_sql",
+            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='ad_stat_job_id') }}",
+            notebook_params={
+                "env": env
+            },
+            trigger_rule=TriggerRule.ALL_SUCCESS
+        )
+
+        series_fb_postprocess_api = DatabricksRunNowOperator(
+            task_id="series_fb_postprocess_api",
+            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='fb_postprocess_job_id') }}",
+            notebook_params={
+                "env": env
+            },
+            trigger_rule=TriggerRule.ALL_SUCCESS
+        )
+
+        series_report_join_sql = DatabricksRunNowOperator(
+            task_id="series_report_join_sql",
+            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='report_join_job_id') }}",
+            notebook_params={
+                "env": env
+            },
+            trigger_rule=TriggerRule.ALL_SUCCESS
+        )
+
+        series_report_stat_sql = DatabricksRunNowOperator(
+            task_id="series_report_stat_sql",
+            job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='report_stat_job_id') }}",
+            notebook_params={
+                "env": env
+            },
+            trigger_rule=TriggerRule.ALL_SUCCESS
+        )
+
+        series_ad_api >> series_ad_stat_sql >> series_fb_postprocess_api >> series_report_join_sql >> series_report_stat_sql
+
+    check_env_after_main_tasks = BranchPythonOperator(
+        task_id="check_env_after_main_tasks",
+        python_callable=_check_env_after_main_tasks,
+        op_kwargs={"env": env},
+        trigger_rule=TriggerRule.ALL_SUCCESS
+    )
+
+    # (!) always triggered
+    with TaskGroup(group_id="update_jobs_from_dev_to_prod") as update_jobs_from_dev_to_prod:
+        get_update_jobs_config = PythonOperator(
+            task_id="get_update_jobs_config",
+            python_callable=_get_update_jobs_config,
+            op_kwargs={
+                "env": "prod",
+                "dag_type": "sql"
+            },
             trigger_rule=TriggerRule.NONE_SKIPPED,
         )
 
