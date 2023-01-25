@@ -129,7 +129,7 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
     tags=["auto_report", "series", "all", "daily"]
     ) as dag_api:
 
-    env = "dev"
+    env = "prod"
     project = "autoreport"
 
     start = DummyOperator(task_id="start")
@@ -294,6 +294,7 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
         # poke_interval=60,
         allowed_states=["success"],
         failed_states=None,
+        # trigger_rule=TriggerRule.ALL_SUCCESS,
     )
 
     # dev
@@ -318,7 +319,7 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_sql",
     tags=["auto_report", "series", "all", "daily"]
     ) as dag_sql:
 
-    env = "dev"
+    env = "prod"
     project = "autoreport"
 
     start = DummyOperator(task_id="start")
