@@ -1,18 +1,12 @@
 import os
-import json
-import pendulum
 
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
-from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from airflow.providers.databricks.operators.databricks import DatabricksRunNowOperator, DatabricksSubmitRunOperator
 from datetime import datetime, timedelta
 
-from airflow.utils.task_group import TaskGroup
 from airflow.utils.trigger_rule import TriggerRule
 from pendulum.tz.timezone import Timezone
-from custom.operators import AutoReportValidationOperator, DailyUtils, BaseUtils
 
 default_args = {
     'owner': 'airflow',

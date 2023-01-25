@@ -85,7 +85,7 @@ def _check_data_interval(**kwargs):
         time_zone="Asia/Seoul"
     )
 
-    if converted_data_interval_end == "17:40:00":
+    if converted_data_interval_end == "13:10:00":
         return "get_notebook_params"
     else:
         return "trigger_sql_dag"
@@ -122,7 +122,7 @@ default_args = {
 
 with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval="*/10 16-18 * * *",
+    schedule_interval="10 13-15 * * *",
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
