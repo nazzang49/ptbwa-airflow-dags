@@ -122,7 +122,7 @@ default_args = {
 
 with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval="0 18 * * *",
+    schedule_interval="0 13 * * *",
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
@@ -311,7 +311,7 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
 
 with DAG(f"{os.path.basename(__file__).replace('.py', '')}_sql",
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval=None,
+    schedule_interval="30/20 13-14 * * *",
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
