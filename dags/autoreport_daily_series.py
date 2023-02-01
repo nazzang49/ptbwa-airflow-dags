@@ -370,6 +370,9 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_sql",
         series_ad_api = DatabricksRunNowOperator(
             task_id="series_ad_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='ad_job_id') }}",
+            notebook_params={
+                "env": env
+            },
             trigger_rule=TriggerRule.NONE_FAILED
         )
 
