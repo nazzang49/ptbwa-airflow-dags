@@ -1,7 +1,7 @@
 import airflow.utils.timezone
 
 from airflow import DAG
-from airflow.models import Variable
+from airflow.models import Variable, DagModel
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.models import DagModel
@@ -13,7 +13,7 @@ default_args={
     "provide_context" : True,
     "depends_on_past" : False,
     "start_date" : airflow.utils.timezone.datetime(2023, 1, 18),
-    "retries" : 10,
+    "retries" : 5,
     "retry_delay" : timedelta(minutes=5),
 }
 
@@ -44,7 +44,7 @@ with DAG(
         task_id = "tt-delete_variable",
         python_callable = _delete_variable,
         op_kwargs = {
-            "variable_key" : ["bundle_list", "bundle_len"]
+            "variable_key" : ["bundle_list", "bundle_len", "query", "crawling_date", "crawling_since_date", "crawling_until_date"]
         }
     )
 
@@ -68,5 +68,6 @@ with DAG(
         task_id = "end"
     )
 
-    before_dag >> delete_variable >> pause_crawling_info_dag >> pause_delete_variable_dag >> end
+    before_dag>> pause_crawling_info_dag >> delete_variable >> pause_delete_variable_dag >> end
+
 
