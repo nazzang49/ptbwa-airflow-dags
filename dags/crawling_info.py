@@ -3,11 +3,13 @@ import math
 import airflow.utils.timezone
 
 from airflow import DAG
-from airflow.models import Variable
+from airflow.models import Variable, DagModel
 from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.ssh.operators.ssh import SSHOperator
+from airflow.providers.databricks.operators.databricks import DatabricksRunNowOperator
+from airflow.utils.trigger_rule import TriggerRule
 
 from datetime import timedelta
 from airflow.models import DagModel
@@ -17,7 +19,7 @@ default_args={
     "provide_context" : True,
     "depends_on_past" : False,
     "start_date" : airflow.utils.timezone.datetime(2023, 1, 18),
-    "retries" : 5,
+    "retries" : 10,
     # "retry_delay" : timedelta(minutes=5),
     "retry_delay" : timedelta(seconds=5),
 }
@@ -32,6 +34,10 @@ with DAG(
     def print_all(bundle):
         print("===========================================")
         print(bundle)
+
+    def _pause_dag(dag_id):
+        dag = DagModel.get_dagmodel(dag_id)
+        dag.set_is_paused(is_paused = True)
     
     def _unpause_dag(dag_id):
         dag = DagModel.get_dagmodel(dag_id)
@@ -41,6 +47,14 @@ with DAG(
         task_id="tt-get_bundle"
     )
 
+    pause_get_bundle_dag = PythonOperator(
+        task_id = "tt-unpause_get_bundle_dag",
+        python_callable = _pause_dag,
+        op_kwargs = {
+            "dag_id" :"tt-get_bundle"
+        }
+    )
+
     app_bundle_variable = Variable.get(key ='bundle_list')
     app_bundle_len = int(Variable.get(key ='bundle_len'))
 
@@ -48,7 +62,7 @@ with DAG(
     app_bundle_variable = app_bundle_variable.replace("'", "")
     app_bundle_list = app_bundle_variable.split(', ')
 
-    cralwing_task_list = list()
+    crawling_task_list = list()
     # batch_size = 2
     batch_num = 3
     batch_size = math.ceil(app_bundle_len/batch_num)
@@ -63,30 +77,29 @@ with DAG(
             # task_id = f"tt-ssh_test_task_{i}",
             task_id = task_id,
             ssh_conn_id = "ssh_default",
-            # command = f"echo '{app_bundle_list[i:i+batch_size]}'"
             command = f"python /home/datateam/crawling/github/ptbwa-crawling-app-info/crawling_app_info.py --is_test 'False' --bundle_list '{app_bundle_list[i:i+batch_size]}' --task_idx {task_idx}"
-            # command = "echo 'Hello'"
         )
-        
-        # c = PythonOperator(
-        #     task_id = f"tt-crawling_task_{i}",
-        #     python_callable = print_all,
-        #     op_kwargs = {
-        #         "bundle" : bundle
-        #     },
-        # )
-        # cralwing_task_list.append(globals()[f"crawling_task_{i}"])
-        cralwing_task_list.append(globals()[f"ssh_test_task_{task_idx}"])
+
+        crawling_task_list.append(globals()[f"ssh_test_task_{task_idx}"])
         task_idx += 1
 
-    unpause_delete_variable_dag = PythonOperator(
-        task_id = "tt-unpause_delete_variable_dag",
-        python_callable = _unpause_dag,
-        op_kwargs = {
-            "dag_id" : "tt-delete_variable"
-        }
+    
+    append_databricks = DatabricksRunNowOperator(
+        task_id = "tt-append_databricks",
+        job_id = "856270508418368",
+        notebook_params = {
+            "crawling_date": Variable.get(key = "crawling_date")
+        },
+        trigger_rule = TriggerRule.ALL_SUCCESS
     )
 
+    unpause_delete_variable_dag = PythonOperator(
+        task_id = "tt-unpause_delete_variable",
+        python_callable = _unpause_dag,
+        op_kwargs = {
+            "dag_id" :"tt-delete_variable"
+        }
+    )
 
     trigger_delete_variable_dag = TriggerDagRunOperator(
         task_id = "tt-trigger_dag2",
@@ -97,4 +110,4 @@ with DAG(
         task_id = "tt-delete_variable"
     )
 
-    before_dag >> cralwing_task_list >> unpause_delete_variable_dag >> trigger_delete_variable_dag >> next_dag
+    before_dag >> pause_get_bundle_dag >> crawling_task_list >> append_databricks >> unpause_delete_variable_dag >> trigger_delete_variable_dag >> next_dag
