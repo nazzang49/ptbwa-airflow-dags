@@ -35,13 +35,16 @@ with DAG(
         print("===========================================")
         print(bundle)
 
-    def _pause_dag(dag_id):
-        dag = DagModel.get_dagmodel(dag_id)
-        dag.set_is_paused(is_paused = True)
-    
     def _unpause_dag(dag_id):
         dag = DagModel.get_dagmodel(dag_id)
-        dag.set_is_paused(is_paused = False)
+        if dag is not None:
+            dag.set_is_paused(is_paused = False)
+
+    
+    def _pause_dag(dag_id):
+        dag = DagModel.get_dagmodel(dag_id)
+        if dag is not None:
+            dag.set_is_paused(is_paused = True)
 
     before_dag = DummyOperator(
         task_id="tt-get_bundle"
