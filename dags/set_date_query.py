@@ -56,6 +56,7 @@ with DAG(
 
     def set_query(crawling_date, crawling_since_date, crawling_until_date):
         databricks_master = "ice.tt_google_play_store_master_nhn"
+        databricks_info = "ice.tt_google_play_store_info_nhn"
 
         recawling_timedelta = relativedelta(months=3)
         recrawling_date = datetime.strftime(datetime.now()-recawling_timedelta, "%Y-%m-%d")
@@ -80,10 +81,10 @@ with DAG(
                     FROM
                         {databricks_master}
                 )
+            -- 일정 기간이 지나고, 이전에 정상적으로 수집했으면 재 크롤링
 
             UNION ALL
-
-            -- 일정 기간이 지나고, 이전에 정상적으로 수집했으면 재 크롤링
+            
             SELECT
                 requestAppBundle
             FROM 
@@ -91,16 +92,29 @@ with DAG(
             WHERE
                 inputDate <= {recrawling_date}
                 AND flag=200
-                
-            UNION ALL
 
             -- status code가 429인 경우 재 크롤링
+                
+            UNION ALL
+            
             SELECT
                 requestAppBundle
             FROM 
                 {databricks_master}                   
             WHERE
                 flag=429
+
+             -- 앱 이름이나 설명이 없는 경우 재 크롤링
+            
+            UNION ALL
+            
+            SELECT
+                requestAppBundle
+            FROM
+                {databricks_info}
+            WHERE 
+                requestAppName IS NULL
+                OR description IS NULL               
         """
 
         Variable.set(key="query", value=query)
