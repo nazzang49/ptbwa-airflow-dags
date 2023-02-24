@@ -78,7 +78,7 @@ with DAG(
             task_id = task_id,
             ssh_conn_id = "ssh_default",
             command = f"python /home/datateam/crawling/github/ptbwa-crawling-app-info/crawling_app_info.py --is_test 'False' --bundle_list '{app_bundle_list[i:i+batch_size]}' --task_idx {task_idx} --crawling_date {Variable.get(key='crawling_date')}"
-        )c
+        )
 
         crawling_task_list.append(globals()[f"ssh_test_task_{task_idx}"])
         task_idx += 1
