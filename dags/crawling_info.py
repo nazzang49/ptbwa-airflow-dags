@@ -96,6 +96,19 @@ with DAG(
         trigger_rule = TriggerRule.ALL_SUCCESS
     )
 
+    
+    kill_chrome_process = SSHOperator(
+        task_id = "tt-kill_chrome_process",
+        ssh_conn_id = "ssh_default",
+        command = "kill -9 `ps -ef|grep chrome|awk '{print $2}'`"
+    )
+
+    kill_chromedriver_process = SSHOperator(
+        task_id = "tt-kill_chromedriver_process",
+        ssh_conn_id = "ssh_default",
+        command = "kill -9 `ps -ef|grep chromedriver|awk '{print $2}'`"
+    )
+
     unpause_delete_variable_dag = PythonOperator(
         task_id = "tt-unpause_delete_variable",
         python_callable = _unpause_dag,
@@ -113,4 +126,4 @@ with DAG(
         task_id = "tt-delete_variable"
     )
 
-    before_dag >> pause_get_bundle_dag >> crawling_task_list >> append_databricks >> unpause_delete_variable_dag >> trigger_delete_variable_dag >> next_dag
+    before_dag >> pause_get_bundle_dag >> crawling_task_list >> append_databricks >> kill_chrome_process >> kill_chromedriver_process >>  unpause_delete_variable_dag >> trigger_delete_variable_dag >> next_dag
