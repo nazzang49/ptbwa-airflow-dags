@@ -8,7 +8,7 @@ from airflow.models import DagModel
 
 from datetime import timedelta
 
-from user_function import unpause_dag, pause_dag
+from user_function import *
 
 default_args={
     "owner" : "hyeji",
@@ -25,9 +25,6 @@ with DAG(
     schedule_interval = None
 ) as dag:
 
-    def _delete_variable(variable_key):
-        for k in variable_key:
-            Variable.delete(key=k)
 
 
     before_dag = DummyOperator(
@@ -36,7 +33,7 @@ with DAG(
 
     delete_variable = PythonOperator(
         task_id = "tt-delete_variable",
-        python_callable = _delete_variable,
+        python_callable = delete_variable,
         op_kwargs = {
             "variable_key" : ["bundle_list", "bundle_len", "query", "crawling_date", "crawling_since_date", "crawling_until_date"]
         }

@@ -16,7 +16,7 @@ from airflow.utils.trigger_rule import TriggerRule
 from datetime import timedelta
 from airflow.models import DagModel
 
-from user_function import unpause_dag, pause_dag
+from user_function import *
 
 default_args={
     "owner" : "hyeji",
@@ -34,10 +34,6 @@ with DAG(
     default_args = default_args,
     schedule_interval = None
 ) as dag:
-
-    def print_all(bundle):
-        print("===========================================")
-        print(bundle)
 
     before_dag = DummyOperator(
         task_id="tt-get_bundle_dag"

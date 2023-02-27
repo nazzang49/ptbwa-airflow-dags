@@ -19,7 +19,7 @@ from databricks import sql
 from datetime import datetime, timedelta
 from pendulum.tz.timezone import Timezone
 
-from user_function import unpause_dag, pause_dag
+from user_function import *
 
 
 recawling_timedelta = relativedelta(months=3)
@@ -41,24 +41,6 @@ with DAG(
     catchup = False
     
 ) as dag:
-
-
-    def get_bundle():
-        bundle = list()
-        with open('/tmp/bundle_list.csv' ,'r') as csvfile:        
-            csvreader = csv.reader(csvfile)
-
-            next(csvreader)
-
-            for row in csvreader:
-                bundle.append(row[0])
-
-        print("===========================================")
-        print("bundle: ", bundle)
-        print("bundle length: ", len(bundle))
-        Variable.set(key='bundle_list', value = bundle)
-        Variable.set(key='bundle_len', value = len(bundle))
-
 
     before_dag = DummyOperator(
         task_id = "set_date_query_dag"
