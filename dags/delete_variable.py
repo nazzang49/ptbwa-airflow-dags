@@ -8,6 +8,8 @@ from airflow.models import DagModel
 
 from datetime import timedelta
 
+from user_function import unpause_dag, pause_dag
+
 default_args={
     "owner" : "hyeji",
     "provide_context" : True,
@@ -19,7 +21,6 @@ default_args={
 
 with DAG(
      dag_id = "tt-delete_variable",
-    # start_date = airflow.utils.timezone.datetsime(2023, 1, 18),
     default_args = default_args,
     schedule_interval = None
 ) as dag:
@@ -28,19 +29,9 @@ with DAG(
         for k in variable_key:
             Variable.delete(key=k)
 
-    def _unpause_dag(dag_id):
-        dag = DagModel.get_dagmodel(dag_id)
-        if dag is not None:
-            dag.set_is_paused(is_paused = False)
-
-    
-    def _pause_dag(dag_id):
-        dag = DagModel.get_dagmodel(dag_id)
-        if dag is not None:
-            dag.set_is_paused(is_paused = True)
 
     before_dag = DummyOperator(
-        task_id = "tt-crawling_info"
+        task_id = "tt-crawling_info_dag"
     )
 
     delete_variable = PythonOperator(
@@ -53,7 +44,7 @@ with DAG(
 
     pause_crawling_info_dag = PythonOperator(
         task_id = "tt-pause_crawling_info_dag",
-        python_callable = _pause_dag,
+        python_callable = pause_dag,
         op_kwargs = {
             "dag_id" :"tt-crawling_info"
         }
@@ -61,7 +52,7 @@ with DAG(
 
     pause_delete_variable_dag = PythonOperator(
         task_id = "tt-pause_delete_variable_dag",
-        python_callable = _pause_dag,
+        python_callable = pause_dag,
         op_kwargs = {
             "dag_id" :"tt-delete_variable"
         }

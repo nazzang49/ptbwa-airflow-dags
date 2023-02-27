@@ -8,11 +8,15 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.ssh.operators.ssh import SSHOperator
+# from airflow.operators.bash_operator import BashOperator
+
 from airflow.providers.databricks.operators.databricks import DatabricksRunNowOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 from datetime import timedelta
 from airflow.models import DagModel
+
+from user_function import unpause_dag, pause_dag
 
 default_args={
     "owner" : "hyeji",
@@ -35,24 +39,13 @@ with DAG(
         print("===========================================")
         print(bundle)
 
-    def _unpause_dag(dag_id):
-        dag = DagModel.get_dagmodel(dag_id)
-        if dag is not None:
-            dag.set_is_paused(is_paused = False)
-
-    
-    def _pause_dag(dag_id):
-        dag = DagModel.get_dagmodel(dag_id)
-        if dag is not None:
-            dag.set_is_paused(is_paused = True)
-
     before_dag = DummyOperator(
-        task_id="tt-get_bundle"
+        task_id="tt-get_bundle_dag"
     )
 
     pause_get_bundle_dag = PythonOperator(
-        task_id = "tt-unpause_get_bundle_dag",
-        python_callable = _pause_dag,
+        task_id = "tt-pause_get_bundle_dag",
+        python_callable = pause_dag,
         op_kwargs = {
             "dag_id" :"tt-get_bundle"
         }
@@ -80,7 +73,7 @@ with DAG(
             # task_id = f"tt-ssh_test_task_{i}",
             task_id = task_id,
             ssh_conn_id = "ssh_default",
-            command = f"python /home/datateam/crawling/github/ptbwa-crawling-app-info/crawling_app_info.py --is_test 'False' --bundle_list '{app_bundle_list[i:i+batch_size]}' --task_idx {task_idx} --crawling_date {Variable.get(key='crawling_date')}"
+            command = f"python /home/datateam/crawling/github/ptbwa-crawling-app-info/crawling_app_info.py --is_test 'False' --bundle_list '{app_bundle_list[i:i+batch_size]}' --task_idx {task_idx} --crawling_date '{Variable.get(key='crawling_date')}'"
         )
 
         crawling_task_list.append(globals()[f"ssh_test_task_{task_idx}"])
@@ -96,34 +89,33 @@ with DAG(
         trigger_rule = TriggerRule.ALL_SUCCESS
     )
 
-    
-    kill_chrome_process = SSHOperator(
-        task_id = "tt-kill_chrome_process",
-        ssh_conn_id = "ssh_default",
-        command = "kill -9 `ps -ef|grep chrome|awk '{print $2}'`"
-    )
+#     kill_chrome_process = SSHOperator(
+#         task_id = "tt-kill_chrome_process",
+#         ssh_conn_id = "ssh_default",
+#         command = "kill -9 `ps -ef|grep chrome|awk '{print $2}'`"
+#     )
 
-    kill_chromedriver_process = SSHOperator(
-        task_id = "tt-kill_chromedriver_process",
-        ssh_conn_id = "ssh_default",
-        command = "kill -9 `ps -ef|grep chromedriver|awk '{print $2}'`"
-    )
+#     kill_chromedriver_process = SSHOperator(
+#         task_id = "tt-kill_chromedriver_process",
+#         ssh_conn_id = "ssh_default",
+#         command = "kill -9 `ps -ef|grep chromedriver|awk '{print $2}'`"
+#     )
 
     unpause_delete_variable_dag = PythonOperator(
         task_id = "tt-unpause_delete_variable",
-        python_callable = _unpause_dag,
+        python_callable = unpause_dag,
         op_kwargs = {
             "dag_id" :"tt-delete_variable"
         }
     )
 
     trigger_delete_variable_dag = TriggerDagRunOperator(
-        task_id = "tt-trigger_dag2",
+        task_id = "tt-trigger_delete_variable_dag",
         trigger_dag_id = "tt-delete_variable",
     )
 
-    next_dag = DummyOperator(
-        task_id = "tt-delete_variable"
-    )
+#     next_dag = DummyOperator(
+#         task_id = "tt-delete_variable_dag"
+#     )
 
-    before_dag >> pause_get_bundle_dag >> crawling_task_list >> append_databricks >> kill_chrome_process >> kill_chromedriver_process >>  unpause_delete_variable_dag >> trigger_delete_variable_dag >> next_dag
+    before_dag >> pause_get_bundle_dag >> crawling_task_list >> append_databricks >> unpause_delete_variable_dag >>  trigger_delete_variable_dag 
