@@ -76,16 +76,24 @@ def _get_update_jobs_config(**kwargs):
 def _check_data_interval(**kwargs):
     """
     A method for checking data interval
-    desc:
-        data_interval_end = now
     """
-    converted_data_interval_end = BaseUtils.convert_pendulum_datetime_to_str(
+    ti = kwargs["ti"]
+    # for airflow
+    data_interval_end_time = BaseUtils.convert_pendulum_datetime_to_str(
         date=kwargs["data_interval_end"],
         format="%H:%M:%S",
         time_zone="Asia/Seoul"
     )
 
-    if converted_data_interval_end == "13:10:00":
+    # for databricks
+    data_interval_end_date = BaseUtils.convert_pendulum_datetime_to_str(
+        date=kwargs["data_interval_end"],
+        format="%Y-%m-%d %H:%M:%S",
+        time_zone="Asia/Seoul"
+    )
+    ti.xcom_push(key="data_interval_end", value=data_interval_end_date)
+
+    if data_interval_end_time == "13:10:00":
         return "get_notebook_params"
     else:
         return "trigger_sql_dag"
@@ -188,7 +196,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="series_gad_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gad_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end_date') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
