@@ -93,10 +93,14 @@ def _check_data_interval(**kwargs):
     )
     ti.xcom_push(key="data_interval_end", value=data_interval_end_date)
 
-    if data_interval_end_time == "13:10:00":
-        return "get_notebook_params"
-    else:
-        return "trigger_sql_dag"
+    # (!) prod
+    # if data_interval_end_time == "13:10:00":
+    #     return "get_notebook_params"
+    # else:
+    #     return "trigger_sql_dag"
+
+    # (!) dev
+    return "get_notebook_params"
 
 def _get_total_period(**kwargs):
     """
@@ -137,7 +141,7 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
     tags=["auto_report", "kakaopay", "all", "daily"]
     ) as dag_api:
 
-    env = "prod"
+    env = "dev"
     project = "autoreport"
 
     start = DummyOperator(task_id="start")
