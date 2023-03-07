@@ -93,10 +93,14 @@ def _check_data_interval(**kwargs):
     )
     ti.xcom_push(key="data_interval_end", value=data_interval_end_date)
 
-    if data_interval_end_time == "13:10:00":
-        return "get_notebook_params"
-    else:
-        return "trigger_sql_dag"
+    # dev
+    return "get_notebook_params"
+
+    # prod
+    # if data_interval_end_time == "13:10:00":
+    #     return "get_notebook_params"
+    # else:
+    #     return "trigger_sql_dag"
 
 def _get_total_period(**kwargs):
     """
@@ -130,7 +134,7 @@ default_args = {
 
 with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
     start_date=datetime(2022, 12, 19, tzinfo=Timezone("Asia/Seoul")),
-    schedule_interval="10 13-15 * * *",
+    schedule_interval=None,
     catchup=False,
     default_args=default_args,
     render_template_as_native_obj=True,
@@ -197,7 +201,7 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gad_job_id') }}",
             notebook_params={
                 "env": env,
-                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end_date') }}"
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -206,7 +210,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="series_fb_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='fb_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -215,7 +220,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="series_twt_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='twt_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -224,7 +230,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="series_twt_org_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='twt_org_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -233,7 +240,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="series_asa_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='asa_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -242,7 +250,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="series_tik_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='tik_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )

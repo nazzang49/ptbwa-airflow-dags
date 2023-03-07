@@ -200,7 +200,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="kakaopay_gad_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gad_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -209,7 +210,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="kakaopay_gsh_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='gsh_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -218,7 +220,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="kakaopay_kmt_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='kmt_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -227,7 +230,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="kakaopay_nsa_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='nsa_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -236,7 +240,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="kakaopay_fb_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='fb_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
@@ -245,7 +250,8 @@ with DAG(f"{os.path.basename(__file__).replace('.py', '')}_api",
             task_id="kakaopay_free_api",
             job_id="{{ ti.xcom_pull(task_ids='get_notebook_params', key='free_job_id') }}",
             notebook_params={
-                "env": env
+                "env": env,
+                "data_interval_end": "{{ ti.xcom_pull(task_ids='check_data_interval', key='data_interval_end') }}"
             },
             trigger_rule=TriggerRule.ALL_SUCCESS
         )
