@@ -55,10 +55,9 @@ with DAG(
         }
     )
 
-    end = DummyOperator(
-        task_id = "end"
-    )
+    # end = DummyOperator(
+    #     task_id = "end"
+    # )
 
-    before_dag>> pause_crawling_info_dag >> delete_variable >> pause_delete_variable_dag >> end
-
+    before_dag>> pause_crawling_info_dag >> delete_variable >> pause_delete_variable_dag # >> end
 
