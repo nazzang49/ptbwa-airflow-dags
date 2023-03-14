@@ -153,7 +153,7 @@ def send_alarm_on_success(context):
     
     url = "https://hooks.slack.com/services/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"
     # icon_emoji = ":crying_cat_face:"
-    channel = "# monitoring_airflow"
+    channel = "# monitoring_airflow_test"
     payload = {
         "channel": channel,
         "username": "CRAWLING_APP_INFO",
@@ -190,7 +190,7 @@ def send_alarm_on_fail(context):
     # url = f"{conn.host}/{conn.password}"
     url = "https://hooks.slack.com/services/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"
     # icon_emoji = ":crying_cat_face:"
-    channel = "# monitoring_airflow"
+    channel = "# monitoring_airflow_test"
     payload = {
         "channel": channel,
         "username": "CRAWLING_APP_INFO",
