@@ -26,24 +26,27 @@ default_args={
     "retries" : 10,
     # "retry_delay" : timedelta(minutes=5),
     "retry_delay" : timedelta(seconds=5),
+    "on_failure_callback" : send_alarm_on_fail,
+    "on_success_callback" : send_alarm_on_success
 }
 
 with DAG(
-    dag_id = "tt-crawling_info",
+    dag_id = "crawling_info",
     # start_date = airflow.utils.timezone.datetime(2023, 1, 18),
     default_args = default_args,
     schedule_interval = None
 ) as dag:
 
+
     before_dag = DummyOperator(
-        task_id="tt-get_bundle_dag"
+        task_id="get_bundle_dag"
     )
 
     pause_get_bundle_dag = PythonOperator(
-        task_id = "tt-pause_get_bundle_dag",
+        task_id = "pause_get_bundle_dag",
         python_callable = pause_dag,
         op_kwargs = {
-            "dag_id" :"tt-get_bundle"
+            "dag_id" :"get_bundle"
         }
     )
 
@@ -64,12 +67,12 @@ with DAG(
     # for i in range(0, app_bundle_len, batch_size):
     # for i in range(app_bundle_len_variable):
     for i in range(0, app_bundle_len, batch_size):
-        task_id = f"tt-ssh_test_task_{task_idx}"
+        task_id = f"ssh_test_task_{task_idx}"
         globals()[f"ssh_test_task_{task_idx}"] = SSHOperator(
-            # task_id = f"tt-ssh_test_task_{i}",
+            # task_id = f"ssh_test_task_{i}",
             task_id = task_id,
             ssh_conn_id = "ssh_default",
-            command = f"python /home/datateam/crawling/github/ptbwa-crawling-app-info/crawling_app_info.py --is_test 'False' --bundle_list '{app_bundle_list[i:i+batch_size]}' --task_idx {task_idx} --crawling_date '{Variable.get(key='crawling_date')}'"
+            command = f"python /home/datateam/crawling/github/ptbwa-crawling-app-info/crawling_app_info.py --is_test 'True' --bundle_list '{app_bundle_list[i:i+batch_size]}' --task_idx {task_idx} --crawling_date '{Variable.get(key='crawling_date')}'"
         )
 
         crawling_task_list.append(globals()[f"ssh_test_task_{task_idx}"])
@@ -77,10 +80,11 @@ with DAG(
 
     
     append_databricks = DatabricksRunNowOperator(
-        task_id = "tt-append_databricks",
+        task_id = "append_databricks",
         job_id = "856270508418368",
         notebook_params = {
-            "crawling_date": Variable.get(key = "crawling_date")
+            "crawling_date": Variable.get(key = "crawling_date"),
+            "is_test": 'True'
         },
         trigger_rule = TriggerRule.ALL_SUCCESS
     )
@@ -98,20 +102,17 @@ with DAG(
 #     )
 
     unpause_delete_variable_dag = PythonOperator(
-        task_id = "tt-unpause_delete_variable",
+        task_id = "unpause_delete_variable",
         python_callable = unpause_dag,
         op_kwargs = {
-            "dag_id" :"tt-delete_variable"
+            "dag_id" :"delete_variable"
         }
     )
 
     trigger_delete_variable_dag = TriggerDagRunOperator(
-        task_id = "tt-trigger_delete_variable_dag",
-        trigger_dag_id = "tt-delete_variable",
+        task_id = "trigger_delete_variable_dag",
+        trigger_dag_id = "delete_variable",
     )
 
-#     next_dag = DummyOperator(
-#         task_id = "tt-delete_variable_dag"
-#     )
 
     before_dag >> pause_get_bundle_dag >> crawling_task_list >> append_databricks >> unpause_delete_variable_dag >>  trigger_delete_variable_dag 

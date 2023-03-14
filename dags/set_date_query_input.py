@@ -16,25 +16,27 @@ default_args={
     "owner" : "hyeji",
     "provide_context" : True,
     "depends_on_past" : False,
+    "on_failure_callback" : send_alarm_on_fail,
+    "on_success_callback" : send_alarm_on_success
     # "retries" : 1
     # "start_date" : airflow.utils.timezone.datetime(2023, 2, 15),
 }
 
 with DAG(
-    dag_id = "tt-set_date_query_input",
+    dag_id = "set_date_query_input",
     # start_date = airflow.utils.timezone.datetime(2023, 1, 18),
     default_args = default_args,
     # schedule_interval = "0 1 * * *",
     schedule_interval = None,
     # schedule_interval = "@daily",
-    start_date = datetime(2023, 2, 23, tzinfo=Timezone("Asia/Seoul")),
+    start_date = datetime(2023, 3, 8, tzinfo=Timezone("Asia/Seoul")),
     catchup = False
     
 ) as dag: 
 
     
-    tt_set_input_specific_task = PythonOperator(
-        task_id = "tt-set_input_specific_task",
+    set_input_specific_task = PythonOperator(
+        task_id = "set_input_specific_task",
         python_callable = set_crawling_date_query,
         op_kwargs = {
             "crawling_date" : "{{dag_run.conf.crawling_date}}",
@@ -43,8 +45,8 @@ with DAG(
         }
     )
 
-    tt_set_input_yesterday_task = PythonOperator(
-        task_id = "tt-set_input_yesterday_task",
+    set_input_yesterday_task = PythonOperator(
+        task_id = "set_input_yesterday_task",
         python_callable = set_crawling_date_query,
         op_kwargs = {
             "crawling_date" : "{{dag_run.conf.crawling_date}}",
@@ -55,26 +57,21 @@ with DAG(
     )
     
     unpause_get_bundle_dag = PythonOperator(
-        task_id = "tt-unpause_get_bundle_dag",
-        python_callable = unpause_dag,
+        task_id = "unpause_get_bundle_dag",
+        python_callable = pause_dag,
         op_kwargs = {
-            "dag_id" :"tt-get_bundle"
+            "dag_id" :"get_bundle"
         },
-        trigger_rule = TriggerRule.ALL_DONE
+        trigger_rule = TriggerRule.NONE_FAILED
     )
 
     trigger_crawling_info_dag = TriggerDagRunOperator(
-        task_id = "tt-trigger_get_bundle_dag",
-        trigger_dag_id = "tt-get_bundle",
-        # trigger_rule = TriggerRule.ALL_DONE  
+        task_id = "trigger_get_bundle_dag",
+        trigger_dag_id = "get_bundle",
+        trigger_rule = TriggerRule.ALL_DONE  
     )
-
-    # next_dag = DummyOperator(
-    #     task_id = "tt-get_bundle_dag_dag",
-    #     trigger_rule = TriggerRule.ALL_DONE
-    # )
-
-    tt_set_input_specific_task >> tt_set_input_yesterday_task >> unpause_get_bundle_dag >> trigger_crawling_info_dag #>> next_dag
+    
+    set_input_specific_task >> set_input_yesterday_task >> unpause_get_bundle_dag >> trigger_crawling_info_dag
 
 
 

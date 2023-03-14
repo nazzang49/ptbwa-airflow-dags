@@ -17,22 +17,22 @@ default_args={
     "start_date" : airflow.utils.timezone.datetime(2023, 1, 18),
     "retries" : 5,
     "retry_delay" : timedelta(minutes=5),
+    "on_failure_callback" : send_alarm_on_fail,
+    "on_success_callback" : send_alarm_on_success
 }
 
 with DAG(
-     dag_id = "tt-delete_variable",
+     dag_id = "delete_variable",
     default_args = default_args,
     schedule_interval = None
 ) as dag:
 
-
-
     before_dag = DummyOperator(
-        task_id = "tt-crawling_info_dag"
+        task_id = "crawling_info_dag"
     )
 
     delete_variable = PythonOperator(
-        task_id = "tt-delete_variable",
+        task_id = "delete_variable",
         python_callable = delete_variable,
         op_kwargs = {
             "variable_key" : ["bundle_list", "bundle_len", "query", "crawling_date", "crawling_since_date", "crawling_until_date"]
@@ -40,18 +40,18 @@ with DAG(
     )
 
     pause_crawling_info_dag = PythonOperator(
-        task_id = "tt-pause_crawling_info_dag",
+        task_id = "pause_crawling_info_dag",
         python_callable = pause_dag,
         op_kwargs = {
-            "dag_id" :"tt-crawling_info"
+            "dag_id" :"crawling_info"
         }
     )
 
     pause_delete_variable_dag = PythonOperator(
-        task_id = "tt-pause_delete_variable_dag",
+        task_id = "pause_delete_variable_dag",
         python_callable = pause_dag,
         op_kwargs = {
-            "dag_id" :"tt-delete_variable"
+            "dag_id" :"delete_variable"
         }
     )
 

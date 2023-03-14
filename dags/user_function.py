@@ -1,6 +1,12 @@
 import airflow
+import csv
+import requests
 
 from airflow.models import DagModel, Variable
+
+from datetime import timedelta, datetime
+from dateutil.relativedelta import relativedelta
+from pytz import timezone
 
 def get_bundle():
     bundle = list()
@@ -11,7 +17,9 @@ def get_bundle():
 
         for row in csvreader:
             bundle.append(row[0])
-
+    
+    bundle = list(set(bundle))
+    
     print("===========================================")
     print("bundle: ", bundle)
     print("bundle length: ", len(bundle))
@@ -27,10 +35,11 @@ def pause_dag(dag_id):
     dag = DagModel.get_dagmodel(dag_id)
     if dag is not None:
         dag.set_is_paused(is_paused = True)
-
+        
 def delete_variable(variable_key):
     for k in variable_key:
         Variable.delete(key=k)
+
 
 def set_crawling_date_query(crawling_date, crawling_since_date, crawling_until_date):
         crawling_date, crawling_since_date, crawling_until_date = set_crawling_date(crawling_date, crawling_since_date, crawling_until_date)
@@ -54,11 +63,11 @@ def set_crawling_date(crawling_date, crawling_since_date, crawling_until_date):
 
 
 def set_query(crawling_date, crawling_since_date, crawling_until_date):
-    databricks_master = "ice.tt_google_play_store_master_nhn"
-    databricks_info = "ice.tt_google_play_store_info_nhn"
+    databricks_master = "tt_ice.app_master_nhn"
+    databricks_info = "tt_ice.app_info_nhn"
 
     recawling_timedelta = relativedelta(months=3)
-    recrawling_date = datetime.strftime(datetime.now()-recawling_timedelta, "%Y-%m-%d")
+    recrawling_date = datetime.strftime(datetime.now(timezone('Asia/Seoul'))-recawling_timedelta, "%Y-%m-%d")
     
     query = f"""
         SELECT 
@@ -113,7 +122,80 @@ def set_query(crawling_date, crawling_since_date, crawling_until_date):
             {databricks_info}
         WHERE 
             requestAppName IS NULL
-            OR description IS NULL               
+            OR description IS NULL     
+        
+        UNION ALL
+        
+        SELECT 
+            DISTINCT requestAppBundle 
+        FROM 
+            {databricks_info} 
+        WHERE
+            category01 IS NULL
     """
 
     Variable.set(key="query", value=query)
+def send_alarm_on_success(context):
+    """
+    A method for sending complete message to slack on success tasks
+    """
+    dag = context.get('task_instance').dag_id
+    task = context.get('task_instance').task_id
+    exec_date = context.get('data_interval_end')
+
+    message = f"""
+        :large_green_circle: [TASK_SUCCESS]
+        *DAG*: {dag}
+        *TASK*: {task}
+        *EXECUTION_TIME*: {exec_date}
+        *ASSIGNEE*: hyeji.kim@ptbwa.com
+    """
+    
+    url = "https://hooks.slack.com/services/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"
+    # icon_emoji = ":crying_cat_face:"
+    channel = "# monitoring_airflow"
+    payload = {
+        "channel": channel,
+        "username": "CRAWLING_APP_INFO",
+        "text": message,
+        # "icon_emoji": icon_emoji
+    }
+
+    requests.post(url, json=payload)
+
+    
+def send_alarm_on_fail(context):
+    """
+    A method for sending error message to slack on fail tasks
+    """
+
+    dag = context.get('task_instance').dag_id
+    task = context.get('task_instance').task_id
+    exec_date = context.get('data_interval_end')
+    exception = context.get('exception')
+    log_url = context.get('task_instance').log_url
+
+    message = f"""
+        :red_circle: [TASK_FAILED]
+        *DAG*: {dag}
+        *TASK*: {task}
+        *EXECUTION_TIME*: {exec_date}
+        *EXCEPTION*: {exception}
+        *ASSIGNEE*: hyeji.kim@ptbwa.com
+        *LOG_URL*: {log_url}
+    """
+
+    # 1. using connection
+    # conn = BaseHook.get_connection("slack_default")
+    # url = f"{conn.host}/{conn.password}"
+    url = "https://hooks.slack.com/services/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"
+    # icon_emoji = ":crying_cat_face:"
+    channel = "# monitoring_airflow"
+    payload = {
+        "channel": channel,
+        "username": "CRAWLING_APP_INFO",
+        "text": message,
+        # "icon_emoji": icon_emoji
+    }
+
+    requests.post(url, json=payload)

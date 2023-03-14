@@ -30,11 +30,13 @@ default_args={
     "owner" : "hyeji",
     "provide_context" : True,
     "depends_on_past" : False,
-    "retries" : 5
+    "retries" : 5,
+    "on_failure_callback" : send_alarm_on_fail,
+    "on_success_callback" : send_alarm_on_success
 }
 
 with DAG(
-    dag_id = "tt-get_bundle",
+    dag_id = "get_bundle",
     default_args = default_args,
     schedule_interval = None,
     start_date = datetime(2023, 2, 16, tzinfo=Timezone("Asia/Seoul")),
@@ -47,10 +49,10 @@ with DAG(
     )
 
     pause_set_date_query_dag = PythonOperator(
-        task_id = "tt-pause_set_date_query_dag",
+        task_id = "pause_set_date_query_dag",
         python_callable = pause_dag,
         op_kwargs = {
-            "dag_id" :"tt-set_date_query"
+            "dag_id" :"set_date_query"
         }
     )
 
@@ -63,27 +65,21 @@ with DAG(
     )
 
     get_bundle_task = PythonOperator(
-        task_id = 'tt-get_bundle',
+        task_id = 'get_bundle',
         python_callable = get_bundle
     )
 
     unpause_crawling_info = PythonOperator(
-        task_id = 'tt-unpause_crawling_info',
+        task_id = 'unpause_crawling_info',
         python_callable = unpause_dag,
         op_kwargs = {
-            "dag_id" : "tt-crawling_info"
+            "dag_id" : "crawling_info"
         }
     )
 
     trigger_crawling_info_dag = TriggerDagRunOperator(
-        task_id = "tt-trigger_crawling_info_dag",
-        trigger_dag_id = "tt-crawling_info",
-        
+        task_id = "trigger_crawling_info_dag",
+        trigger_dag_id = "crawling_info",
     )
 
-    # next_dag = DummyOperator(
-    #     task_id = "tt-crawling_info_dag"
-    # )
-
-    before_dag >> pause_set_date_query_dag >> connect_databricks_sql >> get_bundle_task >> unpause_crawling_info >> trigger_crawling_info_dag #>> next_dag
-
+    before_dag >> pause_set_date_query_dag >> connect_databricks_sql >> get_bundle_task >> unpause_crawling_info >> trigger_crawling_info_dag 
