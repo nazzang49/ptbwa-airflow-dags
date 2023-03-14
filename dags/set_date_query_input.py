@@ -58,7 +58,7 @@ with DAG(
     
     unpause_get_bundle_dag = PythonOperator(
         task_id = "unpause_get_bundle_dag",
-        python_callable = pause_dag,
+        python_callable = unpause_dag,
         op_kwargs = {
             "dag_id" :"get_bundle"
         },
