@@ -26,8 +26,8 @@ default_args={
 with DAG(
     dag_id = "set_date_query_yesterday",
     default_args = default_args,
-    schedule_interval = "0 1 * * *",
-    # schedule_interval = None,
+    # schedule_interval = "0 1 * * *",
+    schedule_interval = None,
     # schedule_interval = "@daily",
     start_date = datetime(2023, 3, 9, tzinfo=Timezone("Asia/Seoul")),
     catchup = False
