@@ -56,6 +56,8 @@ with DAG(
     app_bundle_variable = app_bundle_variable[1:-1]
     app_bundle_variable = app_bundle_variable.replace("'", "")
     app_bundle_list = app_bundle_variable.split(', ')
+    for idx, b in enumerate(app_bundle_list):
+        app_bundle_list[idx] = b.strip()
 
     crawling_task_list = list()
     # batch_size = 2
